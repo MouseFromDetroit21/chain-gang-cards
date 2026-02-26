@@ -1,5 +1,8 @@
+[phases.install]
+cmds = ["npm install --prefer-offline=false"]
+
 [phases.build]
-cmds = ["npm ci"]
+cmds = []
 
 [start]
 cmd = "node server.js"
