@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "id": "0e10e885-fddb-4420-90e0-5afd8ff9a174",
+      "username": "mouse21ball",
+      "displayName": "mouse21ball",
+      "password": "$2b$10$1HGZmBcRVdCDRz2e7NMRUOUB/55f8Cx1L.gVuNxM2c5jPcIVcaUD6",
+      "avatar": "🎴",
+      "chips": 1000,
+      "wins": 0,
+      "losses": 0,
+      "createdAt": 1772105822538
+    }
+  ],
+  "games": []
+}
