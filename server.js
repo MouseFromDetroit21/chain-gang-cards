@@ -257,11 +257,6 @@ function checkAllAnted(roomId) {
   const active=room.players.filter(p=>!p.folded);
   if(active.every(p=>p.ready)){
     active.forEach(p=>{p.ready=false;});
-    room.phase='pairs';
-    addLog(room,'Pairs on the board!','imp');
-    broadcastRoom(roomId);
-  if(active.every(p=>p.ready)){
-    active.forEach(p=>{p.ready=false;});
     room.phase='draw';
     addLog(room,'Pick up to 2 cards to swap!','imp');
     broadcastRoom(roomId);
