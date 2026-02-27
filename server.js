@@ -603,4 +603,4 @@ io.on('connection',socket=>{
 });
 
 app.get('*path',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
-server.listen(PORT,()=>console.log(`Chain Gang Poker running on port ${PORT}`));
+server.listen(PORT, '0.0.0.0',()=>console.log(`Chain Gang Poker running on port ${PORT}`));
