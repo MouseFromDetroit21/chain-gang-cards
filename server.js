@@ -475,20 +475,17 @@ function startBadugiGame(roomId) {
     p.hand=deal(4);p.bet=0;p.folded=false;
     p.decl=null;p.selectedDraw=[];p.ready=false;p.drawDone=false;p.acted=false;
   });
-  room.deckIdx=idx;room.phase='ante';room.log=[];
-  addLog(room,'Badugi! 4 cards dealt. Post your ante.','imp');
+  room.deckIdx=idx;room.log=[];
+  if(carryPot>0){
+    room.phase='draw';
+    addLog(room,'POT ROLLS OVER! New hand — draw round 1 of 3.','imp');
+  } else {
+    room.phase='ante';
+    addLog(room,'Badugi! 4 cards dealt. Post your ante.','imp');
+  }
   broadcastRoom(roomId);
 }
-function checkAllAntedBadugi(roomId) {
-  const room=rooms[roomId];
-  const active=room.players.filter(p=>!p.folded);
-  if(active.every(p=>p.ready)){
-    active.forEach(p=>{p.ready=false;});
-    startBadugiDraw(room);
-  }
-}
 function startBadugiDraw(room) {
-  room.drawRound=(room.drawRound||0)+1;
   room.phase='draw';
   room.players.forEach(p=>{if(!p.folded){p.drawDone=false;p.selectedDraw=[];}});
   addLog(room,`Draw round ${room.drawRound} of 3 — swap any cards!`,'imp');
