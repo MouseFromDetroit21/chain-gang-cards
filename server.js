@@ -470,7 +470,7 @@ function startBadugiGame(roomId) {
   const deck=shuffle(makeDeck());
   let idx=0;
   const deal=n=>{const c=deck.slice(idx,idx+n);idx+=n;return c;};
-  room.deck=deck;room.pot=0;room.currentBet=0;room.drawRound=0;
+  const carryPot=room.pot||0;room.deck=deck;room.pot=carryPot;room.currentBet=0;room.drawRound=0;
   room.players.forEach(p=>{
     p.hand=deal(4);p.bet=0;p.folded=false;
     p.decl=null;p.selectedDraw=[];p.ready=false;p.drawDone=false;p.acted=false;
@@ -562,18 +562,28 @@ function doBadugiShowdown(room) {
     }
   }
   const half=Math.floor(room.pot/2);
+  let anyWinner=false;
   if(hWin){
+    anyWinner=true;
     const rp=room.players.find(p=>p.userId===hWin.userId);
     if(rp)rp.chips+=half;
     db.updateUser(hWin.userId,{chips:(db.findUser(u=>u.id===hWin.userId)||{chips:0}).chips+half,wins:(db.findUser(u=>u.id===hWin.userId)||{wins:0}).wins+1});
     addLog(room,`HIGH ($${half}): ${hWin.displayName} — ${hWin.hand.map(c=>c.v+c.s).join(' ')}`,'win');
-  } else {addLog(room,'HIGH: No valid badugi — no winner.');}
+  } else {addLog(room,'HIGH: No valid badugi.');}
   if(lWin){
+    anyWinner=true;
     const rp=room.players.find(p=>p.userId===lWin.userId);
     if(rp)rp.chips+=half;
     db.updateUser(lWin.userId,{chips:(db.findUser(u=>u.id===lWin.userId)||{chips:0}).chips+half});
     addLog(room,`LOW ($${half}): ${lWin.displayName} — ${lWin.hand.map(c=>c.v+c.s).join(' ')}`,'win');
-  } else {addLog(room,'LOW: No valid badugi — no winner.');}
+  } else {addLog(room,'LOW: No valid badugi.');}
+  if(!anyWinner){
+    addLog(room,`NO VALID BADUGI — POT ROLLS OVER! Pot is now $${room.pot}`,'imp');
+  } else if(hWin&&lWin){
+    room.pot=0;
+  } else {
+    room.pot=room.pot-half;
+  }
   broadcastRoom(room.id);
   setTimeout(()=>{
     if(rooms[room.id]){
@@ -638,7 +648,7 @@ io.on('connection',socket=>{
     if(!room||room.phase!=='draw')return;
     const p=room.players.find(p=>p.userId===u.userId);
     if(!p)return;
-    p.selectedDraw=(selected||[]).slice(0,room.gameType==='badugi'?4:2);
+    const maxDraw=room.gameType==='badugi'?[3,2,1][room.drawRound-1]??1:2;p.selectedDraw=(selected||[]).slice(0,maxDraw);
     broadcastRoom(socket.roomId);
   });
   socket.on('confirmDraw',({selected})=>{
