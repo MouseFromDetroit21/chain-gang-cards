@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Chain Gang Poker</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { background:#080f08; color:#f0e6c8; font-family:Arial,sans-serif; min-height:100vh; overflow-x:hidden; }
+#app { max-width:480px; margin:0 auto; padding:10px; }
+
+/* ── SCREENS ── */
+.screen { display:none; }
+.screen.active { display:block; }
+
+/* ── HEADER ── */
+.hdr { text-align:center; padding:14px 0 8px; }
+.hdr h1 { font-size:2rem; font-weight:900; color:#d4a017; letter-spacing:4px; text-shadow:0 0 20px rgba(212,160,23,0.4); }
+.hdr p { font-size:0.62rem; color:#666; letter-spacing:3px; margin-top:2px; }
+
+/* ── AUTH ── */
+.auth-box { background:#0d0d0d; border:1px solid #2a2a2a; border-radius:12px; padding:20px; margin-top:10px; }
+.auth-box h2 { color:#d4a017; font-size:1.1rem; letter-spacing:2px; margin-bottom:16px; text-align:center; }
+.field { margin-bottom:12px; }
+.field label { display:block; font-size:0.7rem; color:#888; letter-spacing:1px; margin-bottom:4px; }
+.field input { width:100%; background:#111; border:1px solid #333; color:#f0e6c8; font-size:0.95rem; padding:10px 12px; border-radius:8px; outline:none; }
+.field input:focus { border-color:#d4a017; }
+.btn { font-weight:700; font-size:0.85rem; letter-spacing:1px; padding:11px 18px; border:none; border-radius:8px; cursor:pointer; transition:opacity 0.1s; width:100%; margin-bottom:8px; }
+.btn:active { opacity:0.7; }
+.btn-gold { background:#d4a017; color:#000; }
+.btn-outline { background:transparent; color:#d4a017; border:1px solid #d4a017; }
+.btn-green { background:#1a8a3a; color:#fff; }
+.btn-red { background:#aa2211; color:#fff; }
+.btn-blue { background:#1155aa; color:#fff; }
+.btn-purple { background:#772299; color:#fff; }
+.btn-gray { background:#222; color:#ccc; border:1px solid #333; }
+.btn-sm { padding:8px 14px; font-size:0.78rem; width:auto; margin-bottom:0; }
+.err { color:#ff6644; font-size:0.75rem; margin-top:6px; text-align:center; }
+.toggle-auth { text-align:center; font-size:0.75rem; color:#888; margin-top:12px; }
+.toggle-auth a { color:#d4a017; cursor:pointer; text-decoration:underline; }
+
+/* ── AVATAR PICKER ── */
+.avatar-grid { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:10px 0; }
+.av-opt { font-size:1.8rem; padding:6px; border-radius:8px; border:2px solid transparent; cursor:pointer; }
+.av-opt.selected { border-color:#d4a017; background:rgba(212,160,23,0.1); }
+
+/* ── LOBBY ── */
+.lobby-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
+.user-pill { display:flex; align-items:center; gap:8px; background:#111; border:1px solid #2a2a2a; border-radius:20px; padding:6px 12px; }
+.user-pill .av { font-size:1.4rem; }
+.user-pill .info { }
+.user-pill .uname { font-size:0.8rem; font-weight:700; color:#d4a017; }
+.user-pill .uchips { font-size:0.65rem; color:#888; }
+.lobby-btns { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+.lobby-btn { background:#111; border:1px solid #2a2a2a; border-radius:10px; padding:16px; text-align:center; cursor:pointer; transition:border-color 0.2s; }
+.lobby-btn:active { border-color:#d4a017; }
+.lobby-btn .lbicon { font-size:2rem; margin-bottom:6px; }
+.lobby-btn .lbtitle { font-size:1rem; font-weight:700; color:#d4a017; letter-spacing:2px; }
+.lobby-btn .lbdesc { font-size:0.7rem; color:#666; margin-top:4px; }
+.code-input-row { display:flex; gap:8px; margin-top:10px; }
+.code-input { flex:1; background:#111; border:1px solid #333; color:#f0e6c8; font-size:1.1rem; font-weight:700; padding:10px; border-radius:8px; text-align:center; letter-spacing:4px; outline:none; text-transform:uppercase; }
+
+/* ── STATUS BAR ── */
+.sbar { display:flex; justify-content:space-between; align-items:center; background:rgba(212,160,23,0.08); border:1px solid rgba(212,160,23,0.2); border-radius:8px; padding:7px 12px; margin-bottom:8px; flex-wrap:wrap; gap:4px; }
+.sbar-pot { font-size:0.75rem; } .sbar-pot b { color:#d4a017; }
+.sbar-phase { font-size:0.78rem; font-weight:700; color:#f0d060; letter-spacing:2px; text-align:center; flex:1; }
+.sbar-chips { font-size:0.75rem; } .sbar-chips b { color:#d4a017; }
+
+/* ── PLAYERS ── */
+.players-row { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; }
+.player-chip { background:#0d0d0d; border:1px solid #1e1e1e; border-radius:8px; padding:6px 8px; text-align:center; min-width:75px; position:relative; }
+.player-chip.myturn { border-color:#d4a017; box-shadow:0 0 10px rgba(212,160,23,0.25); }
+.player-chip.folded { opacity:0.3; }
+.player-chip .pc-av { font-size:1.1rem; }
+.player-chip .pc-name { font-size:0.65rem; font-weight:700; color:#d4a017; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70px; }
+.player-chip .pc-chips { font-size:0.6rem; color:#888; }
+.player-chip .pc-decl { font-size:0.55rem; padding:1px 4px; border-radius:3px; display:inline-block; margin-top:2px; }
+.decl-high { background:#7a5800; color:#ffd700; }
+.decl-low  { background:#003a7a; color:#60b0ff; }
+.decl-swing{ background:#4a0070; color:#cc80ff; }
+
+/* ── BOARD ── */
+.board { background:radial-gradient(ellipse,#163016,#080f08); border:2px solid #1a4a1a; border-radius:14px; padding:12px; margin-bottom:8px; }
+.board-lbl { text-align:center; font-size:0.58rem; letter-spacing:4px; color:#2a5a2a; margin-bottom:8px; }
+.columns { display:flex; justify-content:center; gap:5px; }
+.col { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.conn { width:1px; height:5px; background:#2a5a2a; }
+.factor-lbl { text-align:center; font-size:0.6rem; color:rgba(212,160,23,0.6); letter-spacing:2px; margin-top:6px; }
+
+/* ── CARDS ── */
+.card { width:48px; height:66px; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:800; flex-shrink:0; border:2px solid #333; position:relative; }
+.card-sm { width:48px; height:32px; font-size:0.72rem; border-radius:5px; }
+.card-back { background:linear-gradient(135deg,#143014,#080f08); border-color:#1a3a1a; }
+.card-face { background:#f5f0e0; border-color:#ccc; color:#111; box-shadow:1px 2px 4px rgba(0,0,0,0.6); }
+.card-face.red { color:#cc2222; }
+.card-face.glow { border-color:#d4a017 !important; box-shadow:0 0 14px rgba(212,160,23,0.8) !important; }
+.card-face.sel { transform:translateY(-8px); border-color:#d4a017; box-shadow:0 0 12px rgba(212,160,23,0.6); }
+.card-face.tap { cursor:pointer; }
+.card-top { position:absolute; top:3px; left:4px; font-size:0.55rem; line-height:1.2; }
+.card-mid { font-size:0.9rem; line-height:1; }
+.card-suit { font-size:1rem; line-height:1; }
+
+/* ── MY HAND ── */
+.my-hand-box { background:#0a0a0a; border:1px solid rgba(212,160,23,0.2); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+.mhb-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:4px; }
+.mhb-lbl { font-size:0.95rem; font-weight:700; color:#d4a017; letter-spacing:2px; }
+.mhb-chips { font-size:0.72rem; color:#888; }
+.hole-cards { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; }
+.draw-hint { text-align:center; font-size:0.62rem; color:#555; margin-top:6px; }
+/* ── BEST HAND DISPLAY ── */
+.best-hand-box { background:rgba(212,160,23,0.07); border:1px solid rgba(212,160,23,0.25); border-radius:8px; padding:7px 10px; margin-top:8px; }
+.bh-title { font-size:0.58rem; color:#888; letter-spacing:3px; margin-bottom:5px; }
+.bh-row { display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; }
+.bh-label { font-size:0.65rem; color:#555; letter-spacing:1px; }
+.bh-name { font-size:0.88rem; font-weight:700; color:#f0d060; letter-spacing:1px; }
+.bh-cards { display:flex; gap:3px; flex-wrap:wrap; }
+.bh-card { font-size:0.68rem; font-weight:700; background:#111; border:1px solid #333; border-radius:4px; padding:2px 5px; }
+.bh-card.red { color:#cc4444; border-color:#553333; }
+.bh-card.black { color:#ddd; }
+.bh-none { font-size:0.72rem; color:#444; font-style:italic; }
+.bh-low-cards { display:flex; gap:3px; margin-top:4px; flex-wrap:wrap; align-items:center; }
+
+/* ── ACTIONS ── */
+.actions { margin-bottom:8px; }
+.act-title { text-align:center; font-size:0.72rem; color:#777; margin-bottom:8px; font-style:italic; }
+.btn-row { display:flex; gap:7px; justify-content:center; flex-wrap:wrap; margin-bottom:6px; }
+.bet-lbl { text-align:center; font-size:0.68rem; color:#555; margin-bottom:6px; }
+.bet-row { display:flex; gap:7px; justify-content:center; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+.bet-input { background:#111; border:1px solid #d4a017; color:#f0d060; font-size:1rem; font-weight:700; padding:8px 10px; border-radius:6px; width:88px; text-align:center; outline:none; }
+.swing-warn { text-align:center; font-size:0.6rem; color:#555; margin-top:4px; }
+
+/* ── LOG ── */
+.log-box { background:#050505; border:1px solid #111; border-radius:8px; padding:8px 10px; height:70px; overflow-y:auto; font-size:0.68rem; line-height:1.7; margin-bottom:8px; }
+.l-imp { color:#f0d060; } .l-win { color:#44cc66; } .l-act { color:#666; }
+
+/* ── CHAT ── */
+.chat-box { background:#050505; border:1px solid #111; border-radius:8px; padding:6px 10px; height:60px; overflow-y:auto; font-size:0.68rem; line-height:1.6; margin-bottom:6px; }
+.chat-msg { color:#888; } .chat-msg b { color:#d4a017; }
+.chat-row { display:flex; gap:6px; }
+.chat-input { flex:1; background:#111; border:1px solid #222; color:#f0e6c8; font-size:0.82rem; padding:7px 10px; border-radius:6px; outline:none; }
+
+/* ── WAITING ── */
+.waiting-box { text-align:center; padding:20px; }
+.waiting-box .w-icon { font-size:2.5rem; margin-bottom:10px; }
+.waiting-box h3 { color:#d4a017; letter-spacing:3px; margin-bottom:8px; }
+.waiting-box p { color:#666; font-size:0.78rem; margin-bottom:14px; }
+.private-code { font-size:2rem; font-weight:900; color:#d4a017; letter-spacing:8px; background:#0d0d0d; border:2px solid #d4a017; border-radius:10px; padding:10px 20px; display:inline-block; margin:10px 0; }
+
+/* ── SHOWDOWN MODAL ── */
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,0.92); display:flex; align-items:center; justify-content:center; z-index:300; padding:16px; }
+.modal { background:#0d0d0d; border:2px solid #d4a017; border-radius:14px; padding:22px; max-width:360px; width:100%; text-align:center; box-shadow:0 0 40px rgba(212,160,23,0.2); }
+.modal h2 { font-size:1.6rem; font-weight:900; color:#d4a017; letter-spacing:4px; margin-bottom:14px; }
+.modal-line { margin:7px 0; font-size:0.85rem; }
+.m-win { color:#44cc66; font-weight:700; }
+.m-info { color:#888; }
+.modal-div { height:1px; background:rgba(212,160,23,0.15); margin:12px 0; }
+.modal-hands { font-size:0.7rem; color:#666; margin-bottom:14px; }
+.modal-hand { margin:3px 0; }
+.modal-hand b { color:#d4a017; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- AUTH SCREEN -->
+<div id="screen-auth" class="screen active">
+  <div class="hdr"><h1>⛓ CHAIN GANG ⛓</h1><p>THE ORIGINAL YARD GAME</p></div>
+  <div class="auth-box" id="login-box">
+    <h2>SIGN IN</h2>
+    <div class="field"><label>USERNAME</label><input id="l-user" type="text" autocomplete="username" placeholder="your username"></div>
+    <div class="field"><label>PASSWORD</label><input id="l-pass" type="password" autocomplete="current-password" placeholder="password"></div>
+    <div id="l-err" class="err"></div>
+    <button class="btn btn-gold" style="margin-top:10px" onclick="doLogin()">SIGN IN</button>
+    <div class="toggle-auth">No account? <a onclick="showRegister()">Create one</a></div>
+  </div>
+  <div class="auth-box" id="register-box" style="display:none">
+    <h2>CREATE ACCOUNT</h2>
+    <div class="field"><label>USERNAME</label><input id="r-user" type="text" autocomplete="username" placeholder="pick a username"></div>
+    <div class="field"><label>PASSWORD</label><input id="r-pass" type="password" autocomplete="new-password" placeholder="create a password"></div>
+    <div class="field"><label>PICK YOUR AVATAR</label>
+      <div class="avatar-grid" id="av-grid"></div>
+    </div>
+    <div id="r-err" class="err"></div>
+    <button class="btn btn-gold" style="margin-top:10px" onclick="doRegister()">CREATE ACCOUNT</button>
+    <div class="toggle-auth">Have an account? <a onclick="showLogin()">Sign in</a></div>
+  </div>
+</div>
+
+<!-- LOBBY SCREEN -->
+<div id="screen-lobby" class="screen">
+  <div class="hdr"><h1>⛓ CHAIN GANG ⛓</h1><p>THE ORIGINAL YARD GAME</p></div>
+  <div class="lobby-header">
+    <div class="user-pill">
+      <div class="av" id="lb-avatar">🎴</div>
+      <div class="info">
+        <div class="uname" id="lb-username">Player</div>
+        <div class="uchips" id="lb-chips">$1000 chips</div>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="doLogout()">LOGOUT</button>
+  </div>
+  <div class="lobby-btns">
+    <div class="lobby-btn" onclick="joinPublic()">
+      <div class="lbicon">🌍</div>
+      <div class="lbtitle">PLAY NOW</div>
+      <div class="lbdesc">Jump into a table with players worldwide</div>
+    </div>
+    <div class="lobby-btn" onclick="createPrivate()">
+      <div class="lbicon">🔒</div>
+      <div class="lbtitle">PRIVATE TABLE</div>
+      <div class="lbdesc">Create a table, share the code with your crew</div>
+    </div>
+    <div>
+      <div class="lbdesc" style="margin-bottom:6px;color:#666">Have a code? Enter it below:</div>
+      <div class="code-input-row">
+        <input class="code-input" id="join-code" placeholder="ABC123" maxlength="6">
+        <button class="btn btn-gold btn-sm" onclick="joinPrivate()">JOIN</button>
+      </div>
+    </div>
+  </div>
+  <div id="lb-err" class="err" style="margin-top:8px"></div>
+</div>
+
+<!-- WAITING SCREEN -->
+<div id="screen-waiting" class="screen">
+  <div class="hdr"><h1>⛓ CHAIN GANG ⛓</h1></div>
+  <div class="waiting-box">
+    <div class="w-icon">⏳</div>
+    <h3>WAITING FOR PLAYERS</h3>
+    <p id="wait-msg">Finding opponents...</p>
+    <div id="private-code-section" style="display:none">
+      <p>Share this code with your friends:</p>
+      <div class="private-code" id="room-code-display"></div>
+      <p style="font-size:0.7rem;color:#555;margin-top:6px">They tap Private Table → enter code → join</p>
+    </div>
+    <div id="wait-players"></div>
+    <button class="btn btn-gray btn-sm" style="margin-top:14px;width:auto" onclick="leaveRoom()">LEAVE TABLE</button>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="screen-game" class="screen">
+  <div id="game-content"></div>
+</div>
+
+</div>
+
+<!-- SHOWDOWN MODAL -->
+<div class="modal-bg" id="showdown-modal" style="display:none">
+  <div class="modal">
+    <h2>⛓ SHOWDOWN ⛓</h2>
+    <div id="sd-content"></div>
+    <div style="margin-top:14px;font-size:0.7rem;color:#555">Next hand starting in 10 seconds...</div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+const AVATARS = ['🎴','🂡','🃏','👑','💀','🐍','🦅','🔱','⚡','🎯','🏆','💎','🃁','🎲','🦁','🐉'];
+let token = localStorage.getItem('cgp_token');
+let me = null;
+let socket = null;
+let currentRoomId = null;
+let betVal = 20;
+let selectedDraw = [];
+
+// ── AVATAR GRID ──────────────────────────────────────────
+let selectedAv = AVATARS[0];
+const avGrid = document.getElementById('av-grid');
+AVATARS.forEach(av => {
+  const d = document.createElement('div');
+  d.className = 'av-opt' + (av === selectedAv ? ' selected' : '');
+  d.textContent = av;
+  d.onclick = () => { selectedAv = av; document.querySelectorAll('.av-opt').forEach(x=>x.classList.remove('selected')); d.classList.add('selected'); };
+  avGrid.appendChild(d);
+});
+
+// ── SCREEN HELPERS ──────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+function showLogin() { document.getElementById('login-box').style.display=''; document.getElementById('register-box').style.display='none'; }
+function showRegister() { document.getElementById('login-box').style.display='none'; document.getElementById('register-box').style.display=''; }
+
+// ── AUTH ─────────────────────────────────────────────────
+async function doLogin() {
+  const userEl = document.getElementById('l-user');
+  const passEl = document.getElementById('l-pass');
+  const errEl  = document.getElementById('l-err');
+  const btnEl  = document.querySelector('#login-box .btn-gold');
+  const user = userEl.value.trim();
+  const pass = passEl.value;
+  if (!user || !pass) { errEl.textContent = 'Fill in all fields'; return; }
+  errEl.textContent = '';
+  btnEl.textContent = 'SIGNING IN...';
+  btnEl.disabled = true;
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass })
+    });
+    const data = await res.json();
+    if (data.error) { errEl.textContent = data.error; return; }
+    token = data.token;
+    me = data.user;
+    localStorage.setItem('cgp_token', token);
+    enterLobby();
+  } catch(e) {
+    errEl.textContent = 'Cannot reach server. Make sure the game server is running.';
+    console.error('Login error:', e);
+  } finally {
+    btnEl.textContent = 'SIGN IN';
+    btnEl.disabled = false;
+  }
+}
+
+async function doRegister() {
+  const userEl = document.getElementById('r-user');
+  const passEl = document.getElementById('r-pass');
+  const errEl  = document.getElementById('r-err');
+  const btnEl  = document.querySelector('#register-box .btn-gold');
+  const user = userEl.value.trim();
+  const pass = passEl.value;
+  if (!user || !pass) { errEl.textContent = 'Fill in all fields'; return; }
+  if (user.length < 3) { errEl.textContent = 'Username must be at least 3 characters'; return; }
+  if (pass.length < 4) { errEl.textContent = 'Password must be 4+ characters'; return; }
+  errEl.textContent = '';
+  btnEl.textContent = 'CREATING...';
+  btnEl.disabled = true;
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass, avatar: selectedAv })
+    });
+    const data = await res.json();
+    if (data.error) { errEl.textContent = data.error; return; }
+    token = data.token;
+    me = data.user;
+    localStorage.setItem('cgp_token', token);
+    enterLobby();
+  } catch(e) {
+    errEl.textContent = 'Cannot reach server. Make sure the game server is running.';
+    console.error('Register error:', e);
+  } finally {
+    btnEl.textContent = 'CREATE ACCOUNT';
+    btnEl.disabled = false;
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('cgp_token');
+  token = null; me = null;
+  if (socket) { socket.disconnect(); socket = null; }
+  showScreen('auth');
+}
+
+// ── LOBBY ────────────────────────────────────────────────
+function enterLobby() {
+  document.getElementById('lb-avatar').textContent = me.avatar;
+  document.getElementById('lb-username').textContent = me.displayName;
+  document.getElementById('lb-chips').textContent = `$${me.chips} chips`;
+  showScreen('lobby');
+  initSocket();
+}
+
+function joinPublic() { document.getElementById('lb-err').textContent=''; socket.emit('joinPublic'); }
+function createPrivate() { socket.emit('createPrivate'); }
+function joinPrivate() {
+  const code = document.getElementById('join-code').value.trim().toUpperCase();
+  if (!code) { document.getElementById('lb-err').textContent='Enter a room code'; return; }
+  socket.emit('joinPrivate', { code });
+}
+function leaveRoom() {
+  if (socket && currentRoomId) { socket.emit('leaveRoom'); }
+  currentRoomId = null;
+  showScreen('lobby');
+}
+
+// ── SOCKET ───────────────────────────────────────────────
+function initSocket() {
+  if (socket) return;
+  socket = io();
+  socket.on('connect', () => { if (token) socket.emit('auth', { token }); });
+  socket.on('authOk', user => { me = user; });
+  socket.on('authError', msg => { alert('Auth error: ' + msg); doLogout(); });
+
+  socket.on('joinedRoom', ({ roomId, isPrivate }) => {
+    currentRoomId = roomId;
+    selectedDraw = [];
+    document.getElementById('private-code-section').style.display = isPrivate ? '' : 'none';
+    if (isPrivate) document.getElementById('room-code-display').textContent = roomId;
+    document.getElementById('wait-msg').textContent = isPrivate ? 'Waiting for your crew...' : 'Finding opponents...';
+    showScreen('waiting');
+  });
+
+  socket.on('privateCode', code => {
+    document.getElementById('room-code-display').textContent = code;
+  });
+
+  socket.on('gameState', state => {
+    if (state.phase === 'waiting') {
+      renderWaiting(state);
+      showScreen('waiting');
+    } else {
+      document.getElementById('showdown-modal').style.display = 'none';
+      renderGame(state);
+      showScreen('game');
+      if (state.phase === 'showdown' && state.winner !== undefined) {
+        renderShowdown(state);
+      }
+    }
+  });
+
+  socket.on('chat', ({ from, avatar, msg }) => {
+    const box = document.getElementById('chat-log');
+    if (!box) return;
+    const d = document.createElement('div');
+    d.className = 'chat-msg';
+    d.innerHTML = `<b>${avatar} ${from}:</b> ${escHtml(msg)}`;
+    box.appendChild(d);
+    box.scrollTop = box.scrollHeight;
+    if (box.children.length > 50) box.removeChild(box.firstChild);
+  });
+
+  socket.on('error', msg => {
+    document.getElementById('lb-err').textContent = msg;
+    showScreen('lobby');
+  });
+}
+
+// ── WAITING SCREEN ───────────────────────────────────────
+function renderWaiting(state) {
+  const wp = document.getElementById('wait-players');
+  wp.innerHTML = state.players.map(p =>
+    `<div style="display:inline-flex;align-items:center;gap:6px;background:#111;border-radius:8px;padding:5px 10px;margin:4px;font-size:0.8rem;">
+      <span>${p.avatar}</span><b style="color:#d4a017">${p.displayName}</b><span style="color:#555">$${p.chips}</span>
+    </div>`
+  ).join('');
+}
+
+// ── GAME RENDER ──────────────────────────────────────────
+const PNAMES = { ante:'ANTE UP', pairs:'PAIRS REVEALED', draw:'DRAW PHASE', bet1:'BETTING RD 1', bet2:'BETTING RD 2', decl:'DECLARE', bet3:'FINAL BET', showdown:'SHOWDOWN', waiting:'WAITING' };
+
+function renderGame(state) {
+  const myP = state.players.find(p => p.isMe);
+  let html = '';
+
+  // Status bar
+  html += `<div class="sbar">
+    <div class="sbar-pot">POT <b>$${state.pot}</b></div>
+    <div class="sbar-phase">${PNAMES[state.phase] || state.phase}</div>
+    <div class="sbar-chips">YOU <b>$${myP?.chips || 0}</b></div>
+  </div>`;
+
+  // Other players
+  html += `<div class="players-row">`;
+  state.players.filter(p => !p.isMe).forEach((p, i) => {
+    const isMyTurn = state.currentTurn !== undefined && state.players.indexOf(p) === state.currentTurn;
+    html += `<div class="player-chip ${p.folded?'folded':''} ${isMyTurn?'myturn':''}">
+      <div class="pc-av">${p.avatar||'🎴'}</div>
+      <div class="pc-name">${p.displayName}</div>
+      <div class="pc-chips">$${p.chips}</div>
+      ${p.decl ? `<div class="pc-decl decl-${p.decl}">${p.decl.toUpperCase()}</div>` : `<div style="font-size:0.55rem;color:#333;margin-top:2px">${p.folded?'FOLD':'🂠'.repeat(Math.min(p.cardCount,5))}</div>`}
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Board
+  html += `<div class="board"><div class="board-lbl">⛓ COMMUNITY BOARD ⛓</div><div class="columns">`;
+  state.cols.forEach((col, i) => {
+    const isFactor = i === 2;
+    html += `<div class="col">
+      ${cardSmallHtml(col.pair[0])}
+      ${cardSmallHtml(col.pair[1])}
+      <div class="conn"></div>
+      ${cardSmallHtml(col.single, isFactor && col.single)}
+    </div>`;
+  });
+  html += `</div>`;
+  if (state.cols[2]?.single) html += `<div class="factor-lbl">⚡ FACTOR: ${state.cols[2].single.v}${state.cols[2].single.s}</div>`;
+  html += `</div>`;
+
+  // My hand
+  // Best hand display
+  let bestHandHtml = '';
+  const bh = state.myBestHand;
+  if (bh && (bh.highName || bh.hasLow)) {
+    bestHandHtml += `<div class="best-hand-box"><div class="bh-title">YOUR BEST POSSIBLE HAND</div>`;
+    // High hand
+    bestHandHtml += `<div class="bh-row">`;
+    bestHandHtml += `<div><div class="bh-label">HIGH</div><div class="bh-name">${bh.highName || '—'}</div></div>`;
+    if (bh.highCards && bh.highCards.length > 0) {
+      bestHandHtml += `<div class="bh-cards">`;
+      bh.highCards.forEach(c => {
+        const isRed = c.includes('♥') || c.includes('♦');
+        bestHandHtml += `<span class="bh-card ${isRed ? 'red' : 'black'}">${c}</span>`;
+      });
+      bestHandHtml += `</div>`;
+    }
+    bestHandHtml += `</div>`;
+    // Low hand
+    if (bh.hasLow && bh.lowCards && bh.lowCards.length > 0) {
+      bestHandHtml += `<div class="bh-low-cards"><span class="bh-label" style="margin-right:4px">LOW:</span>`;
+      bh.lowCards.forEach(c => {
+        const isRed = c.includes('♥') || c.includes('♦');
+        bestHandHtml += `<span class="bh-card ${isRed ? 'red' : 'black'}">${c}</span>`;
+      });
+      bestHandHtml += `</div>`;
+    } else {
+      bestHandHtml += `<div class="bh-low-cards"><span class="bh-none">No qualifying low hand</span></div>`;
+    }
+    bestHandHtml += `</div>`;
+  }
+
+  html += `<div class="my-hand-box">
+    <div class="mhb-top">
+      <div class="mhb-lbl">⛓ YOUR HAND</div>
+      <div class="mhb-chips">$${myP ? myP.chips : 0}</div>
+      ${myP && myP.myDecl ? `<div class="pc-decl decl-${myP.myDecl}">${myP.myDecl.toUpperCase()}</div>` : ''}
+    </div>
+    <div class="hole-cards" id="hole-cards-row">`;
+  (state.myHand || []).forEach((card, i) => {
+    const isSel = (state.mySelectedDraw || selectedDraw).includes(i);
+    html += cardHtml(card, isSel, state.phase === 'draw' ? `tapCard(${i})` : null);
+  });
+  html += `</div>`;
+  if (state.phase === 'draw') html += `<div class="draw-hint">Tap up to 2 cards to swap them</div>`;
+  html += bestHandHtml;
+  html += `</div>`;
+
+  // Actions
+  html += `<div class="actions">`;
+  if (state.phase === 'ante' && !myP?.ready && !myP?.folded) {
+    html += `<div class="act-title">Post $${state.ante} to play this hand</div>
+    <div class="btn-row"><button class="btn btn-gold btn-sm" onclick="doAnte()">POST ANTE $${state.ante}</button></div>`;
+  } else if (state.phase === 'ante' && myP?.ready) {
+    html += `<div class="act-title" style="color:#44cc66">✓ Ante posted — waiting for others...</div>`;
+  } else if (state.phase === 'draw' && !myP?.drawDone) {
+    html += `<div class="btn-row">
+      <button class="btn btn-gold btn-sm" onclick="doDraw()">DRAW (${selectedDraw.length})</button>
+      ${selectedDraw.length === 0 ? `<button class="btn btn-gray btn-sm" onclick="doDraw()">STAND PAT</button>` : ''}
+    </div>`;
+  } else if (state.phase === 'draw' && myP?.drawDone) {
+    html += `<div class="act-title" style="color:#44cc66">✓ Cards drawn — waiting for others...</div>`;
+  } else if (['bet1','bet2','bet3'].includes(state.phase) && !myP?.folded && !myP?.acted) {
+    const isMyTurn = state.currentTurn !== undefined && state.players.findIndex(p=>p.isMe) === state.currentTurn;
+    if (isMyTurn) {
+      html += `<div class="bet-lbl">Current bet: $${state.currentBet} | Pot: $${state.pot}</div>
+      <div class="bet-row">
+        <input class="bet-input" type="number" id="bet-input" value="${betVal}" min="1" step="10" onchange="betVal=+this.value">
+        <button class="btn btn-gold btn-sm" onclick="doRaise()">RAISE</button>
+      </div>
+      <div class="btn-row">
+        ${state.currentBet === 0 ? `<button class="btn btn-gray btn-sm" onclick="doCheck()">CHECK</button>` : `<button class="btn btn-green btn-sm" onclick="doCall()">CALL $${state.currentBet}</button>`}
+        <button class="btn btn-red btn-sm" onclick="doFold()">FOLD</button>
+      </div>`;
+    } else {
+      html += `<div class="act-title">Waiting for ${state.players[state.currentTurn]?.displayName || '...'} to act...</div>`;
+    }
+  } else if (state.phase === 'decl' && !myP?.folded && !myP?.myDecl) {
+    html += `<div class="act-title">Factor card is live — choose your play</div>
+    <div class="btn-row">
+      <button class="btn btn-gold btn-sm" onclick="doDecl('high')">HIGH HAND</button>
+      <button class="btn btn-blue btn-sm" onclick="doDecl('low')">LOW BALL</button>
+      <button class="btn btn-purple btn-sm" onclick="doDecl('swing')">⚡ SWING ⚡</button>
+    </div>
+    <div class="swing-warn">SWING = win both or lose both</div>`;
+  } else if (state.phase === 'decl' && myP?.myDecl) {
+    html += `<div class="act-title" style="color:#44cc66">✓ Declared ${myP.myDecl.toUpperCase()} — waiting for others...</div>`;
+  }
+  html += `</div>`;
+
+  // Log
+  html += `<div class="log-box">`;
+  (state.log || []).forEach(l => {
+    html += `<div class="l-${l.type === 'imp' ? 'imp' : l.type === 'win' ? 'win' : 'act'}">${escHtml(l.msg)}</div>`;
+  });
+  html += `</div>`;
+
+  // Chat
+  html += `<div class="chat-box" id="chat-log"></div>
+  <div class="chat-row">
+    <input class="chat-input" id="chat-input" placeholder="Say something..." maxlength="100" onkeydown="if(event.key==='Enter')sendChat()">
+    <button class="btn btn-gray btn-sm" onclick="sendChat()">SEND</button>
+  </div>`;
+
+  document.getElementById('game-content').innerHTML = html;
+}
+
+function renderShowdown(state) {
+  // State comes from server log — parse it for modal
+  const modal = document.getElementById('showdown-modal');
+  const content = document.getElementById('sd-content');
+  const lines = (state.log || []).filter(l => l.type === 'win' || (l.type === 'imp' && l.msg.includes('Factor')));
+  let html = '';
+  lines.forEach(l => {
+    html += `<div class="modal-line ${l.type === 'win' ? 'm-win' : 'm-info'}">${escHtml(l.msg)}</div>`;
+  });
+  content.innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+// ── CARD HTML ────────────────────────────────────────────
+function cardHtml(card, selected, onclickFn) {
+  if (!card) return `<div class="card card-back"></div>`;
+  const red = (card.s === '♥' || card.s === '♦') ? 'red' : '';
+  const selC = selected ? ' sel' : '';
+  const tapC = onclickFn ? ' tap' : '';
+  const oc = onclickFn ? `onclick="${onclickFn}"` : '';
+  return `<div class="card card-face ${red}${selC}${tapC}" ${oc}>
+    <div class="card-top">${card.v}<br>${card.s}</div>
+    <div class="card-mid">${card.v}</div>
+    <div class="card-suit">${card.s}</div>
+  </div>`;
+}
+function cardSmallHtml(card, glow) {
+  if (!card) return `<div class="card card-sm card-back"></div>`;
+  const red = (card.s === '♥' || card.s === '♦') ? 'red' : '';
+  const glowC = glow ? ' glow' : '';
+  return `<div class="card card-sm card-face ${red}${glowC}">${card.v}${card.s}</div>`;
+}
+
+// ── GAME ACTIONS ─────────────────────────────────────────
+function doAnte() { socket.emit('ante'); }
+
+function tapCard(i) {
+  const idx = selectedDraw.indexOf(i);
+  if (idx >= 0) selectedDraw.splice(idx, 1);
+  else if (selectedDraw.length < 2) selectedDraw.push(i);
+  socket.emit('selectDraw', { selected: selectedDraw });
+  // Re-render just the cards
+  document.querySelectorAll('#hole-cards-row .card').forEach((el, ci) => {
+    if (selectedDraw.includes(ci)) el.classList.add('sel');
+    else el.classList.remove('sel');
+  });
+}
+
+function doDraw() {
+  socket.emit('confirmDraw', { selected: selectedDraw });
+  selectedDraw = [];
+}
+
+function doCheck() { socket.emit('betAction', { action: 'check' }); }
+function doCall() { socket.emit('betAction', { action: 'call' }); }
+function doRaise() {
+  const v = parseInt(document.getElementById('bet-input')?.value || betVal);
+  betVal = v;
+  socket.emit('betAction', { action: 'raise', amount: v });
+}
+function doFold() { socket.emit('betAction', { action: 'fold' }); }
+function doDecl(d) { socket.emit('declare', { decl: d }); }
+function sendChat() {
+  const inp = document.getElementById('chat-input');
+  if (!inp || !inp.value.trim()) return;
+  socket.emit('chat', { msg: inp.value.trim() });
+  inp.value = '';
+}
+
+// ── UTILS ────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── AUTO LOGIN ───────────────────────────────────────────
+(async function() {
+  if (!token) return;
+  try {
+    const res = await fetch('/api/profile', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) { localStorage.removeItem('cgp_token'); return; }
+    me = await res.json();
+    enterLobby();
+  } catch(e) {
+    // Server unreachable - stay on login screen, clear bad token
+    localStorage.removeItem('cgp_token');
+    token = null;
+    document.getElementById('l-err').textContent = 'Server offline. Try again shortly.';
+  }
+})();
+</script>
+</body>
+</html>
+

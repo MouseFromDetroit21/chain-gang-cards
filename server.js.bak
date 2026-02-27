@@ -48,6 +48,7 @@ function authMiddleware(req, res, next) {
   try { const d = jwt.verify(token, JWT_SECRET); req.userId = d.id; next(); }
   catch { res.status(401).json({ error: 'Invalid token' }); }
 }
+
 app.post('/api/register', async (req, res) => {
   const { username, password, avatar } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
@@ -75,6 +76,7 @@ app.get('/api/profile', authMiddleware, (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json(safeUser(user));
 });
+
 const SUITS = ['♠','♥','♦','♣'];
 const VALS  = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
 const VRANK = {2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13,A:14};
@@ -92,15 +94,6 @@ function shuffle(arr) {
     [a[i],a[j]]=[a[j],a[i]];
   }
   return a;
-}
-function combos(arr,k) {
-  if(k===0)return[[]];if(k>arr.length)return[];
-  const res=[];
-  function go(s,cur){
-    if(cur.length===k){res.push([...cur]);return;}
-    for(let i=s;i<arr.length;i++){cur.push(arr[i]);go(i+1,cur);cur.pop();}
-  }
-  go(0,[]);return res;
 }
 function evalHigh(hand) {
   const vs=hand.map(c=>VRANK[c.v]).sort((a,b)=>b-a);
@@ -136,6 +129,15 @@ function cmpLow(a,b) {
   for(let i=0;i<5;i++)if(a[i]!==b[i])return a[i]-b[i];
   return 0;
 }
+function combos(arr,k) {
+  if(k===0)return[[]];if(k>arr.length)return[];
+  const res=[];
+  function go(s,cur){
+    if(cur.length===k){res.push([...cur]);return;}
+    for(let i=s;i<arr.length;i++){cur.push(arr[i]);go(i+1,cur);cur.pop();}
+  }
+  go(0,[]);return res;
+}
 function bestHand(hole,cols) {
   const availPairs=cols.map((col,i)=>({cards:col.pair,colIdx:i})).filter(c=>c.cards&&c.cards[0]&&c.cards[1]);
   const availSingles=cols.map((col,i)=>({card:col.single,colIdx:i})).filter(c=>c.card);
@@ -156,43 +158,18 @@ function bestHand(hole,cols) {
   }
   return{high:bH,highCards:bHC,low:bL,lowCards:bLC};
 }
-const BDRANK_HIGH={A:14,K:13,Q:12,J:11,10:10,9:9,8:8,7:7,6:6,5:5,4:4,3:3,2:2};
-const BDRANK_LOW ={A:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13};
 
-function isBadugi(hand) {
-  const suits=hand.map(c=>c.s);
-  const ranks=hand.map(c=>c.v);
-  return new Set(suits).size===4&&new Set(ranks).size===4;
-}
-function evalBadugiHigh(hand) {
-  if(!isBadugi(hand))return null;
-  return hand.map(c=>BDRANK_HIGH[c.v]).sort((a,b)=>b-a);
-}
-function evalBadugiLow(hand) {
-  if(!isBadugi(hand))return null;
-  return hand.map(c=>BDRANK_LOW[c.v]).sort((a,b)=>b-a);
-}
-function cmpBadugiHigh(a,b) {
-  if(!a&&!b)return 0;if(!a)return 1;if(!b)return-1;
-  for(let i=0;i<4;i++){if(a[i]!==b[i])return b[i]-a[i];}
-  return 0;
-}
-function cmpBadugiLow(a,b) {
-  if(!a&&!b)return 0;if(!a)return 1;if(!b)return-1;
-  for(let i=0;i<4;i++){if(a[i]!==b[i])return a[i]-b[i];}
-  return 0;
-}
 const rooms={};
 const socketUser={};
 const userSocket={};
 
-function createRoom(isPrivate=false,gameType='chaingang') {
+function createRoom(isPrivate=false) {
   const id=isPrivate?Math.random().toString(36).substr(2,6).toUpperCase():uuidv4();
-  rooms[id]={id,isPrivate,gameType,players:[],phase:'waiting',pot:0,currentBet:0,ante:10,cols:[],deck:[],deckIdx:0,log:[],currentTurn:0,drawRound:0};
+  rooms[id]={id,isPrivate,players:[],phase:'waiting',pot:0,currentBet:0,ante:10,cols:[],deck:[],deckIdx:0,log:[],currentTurn:0};
   return rooms[id];
 }
-function publicRoom(gameType) {
-  return Object.values(rooms).find(r=>!r.isPrivate&&r.phase==='waiting'&&r.players.length<5&&r.gameType===gameType)||createRoom(false,gameType);
+function publicRoom() {
+  return Object.values(rooms).find(r=>!r.isPrivate&&r.phase==='waiting'&&r.players.length<5)||createRoom(false);
 }
 function addLog(room,msg,type='act') {
   room.log.unshift({msg,type,ts:Date.now()});
@@ -210,7 +187,7 @@ function phaseCols(room) {
 function sanitizeForPlayer(room,userId) {
   const me=room.players.find(p=>p.userId===userId);
   let myBestHand=null;
-  if(room.gameType==='chaingang'&&me&&me.hand&&me.hand.length>0){
+  if(me&&me.hand&&me.hand.length>0){
     const vc=phaseCols(room);
     const hasPairs=vc.some(c=>c.pair[0]!==null);
     const hasSingles=vc.some(c=>c.single!==null);
@@ -219,29 +196,29 @@ function sanitizeForPlayer(room,userId) {
       if(ec.length>0){
         try{
           const best=bestHand(me.hand,ec);
-          myBestHand={highName:best.high?best.high.n:null,highCards:best.highCards?best.highCards.map(c=>c.v+c.s):[],lowCards:best.lowCards?best.lowCards.map(c=>c.v+c.s):[],hasLow:best.low!==null};
+          myBestHand={
+            highName:best.high?best.high.n:null,
+            highCards:best.highCards?best.highCards.map(c=>c.v+c.s):[],
+            lowCards:best.lowCards?best.lowCards.map(c=>c.v+c.s):[],
+            hasLow:best.low!==null
+          };
         }catch(e){myBestHand=null;}
       }
     }
   }
-  let myBadugiHand=null;
-  if(room.gameType==='badugi'&&me&&me.hand&&me.hand.length===4){
-    myBadugiHand={isValid:isBadugi(me.hand),cards:me.hand.map(c=>c.v+c.s),highRanks:evalBadugiHigh(me.hand),lowRanks:evalBadugiLow(me.hand)};
-  }
   return {
-    roomId:room.id,isPrivate:room.isPrivate,gameType:room.gameType,phase:room.phase,
+    roomId:room.id,isPrivate:room.isPrivate,phase:room.phase,
     pot:room.pot,currentBet:room.currentBet,ante:room.ante,
-    cols:room.gameType==='chaingang'?phaseCols(room):[],
-    log:room.log.slice(0,15),
+    cols:phaseCols(room),log:room.log.slice(0,15),
     myHand:me?me.hand:[],myBet:me?me.bet:0,
     myDecl:me?me.decl:null,myFolded:me?me.folded:false,
     mySelectedDraw:me?me.selectedDraw:[],
-    myBestHand,myBadugiHand,drawRound:room.drawRound||0,
+    myBestHand,
     players:room.players.map(p=>({
       userId:p.userId,username:p.username,displayName:p.displayName,
       avatar:p.avatar,chips:p.chips,bet:p.bet,folded:p.folded,
-      decl:room.phase==='showdown'||p.userId===userId?p.decl:p.decl?'hidden':null,
-      cardCount:p.hand?p.hand.length:0,isMe:p.userId===userId,ready:p.ready,acted:p.acted,drawDone:p.drawDone
+      decl:room.phase==='showdown'||p.userId===userId?p.decl:p.decl?'hidden':null,cardCount:p.hand?p.hand.length:0,
+      isMe:p.userId===userId,ready:p.ready,acted:p.acted
     })),
     currentTurn:room.currentTurn,winner:room.winner||null
   };
@@ -253,6 +230,62 @@ function broadcastRoom(roomId) {
     const sid=userSocket[p.userId];
     if(sid)io.to(sid).emit('gameState',sanitizeForPlayer(room,p.userId));
   });
+}
+
+function startGame(roomId) {
+  const room=rooms[roomId];
+  if(!room||room.players.length<2)return;
+  const deck=shuffle(makeDeck());
+  let idx=0;
+  const deal=n=>{const c=deck.slice(idx,idx+n);idx+=n;return c;};
+  room.deck=deck;
+  room.pot=0;
+  room.currentBet=0;
+  room.cols=Array.from({length:5},()=>({pair:deal(2),single:deal(1)[0]}));
+  room.players.forEach(p=>{
+    p.hand=deal(5);p.bet=0;p.folded=false;
+    p.decl=null;p.selectedDraw=[];p.ready=false;p.drawDone=false;p.acted=false;
+  });
+  room.deckIdx=idx;
+  room.phase='ante';
+  room.log=[];
+  addLog(room,'Fresh deck shuffled! Post your ante.','imp');
+  broadcastRoom(roomId);
+}
+function checkAllAnted(roomId) {
+  const room=rooms[roomId];
+  const active=room.players.filter(p=>!p.folded);
+  if(active.every(p=>p.ready)){
+    active.forEach(p=>{p.ready=false;});
+    room.phase='draw';
+    addLog(room,'Pick up to 2 cards to swap!','imp');
+    broadcastRoom(roomId);
+  }
+}
+function confirmDraw(room,userId,selected) {
+  const p=room.players.find(p=>p.userId===userId);
+  if(!p||p.drawDone)return;
+  const dis=[...selected].sort((a,b)=>b-a);
+  const nc=room.deck.slice(room.deckIdx,room.deckIdx+dis.length);
+  room.deckIdx+=dis.length;
+  dis.forEach(i=>p.hand.splice(i,1));
+  p.hand.push(...nc);
+  p.drawDone=true;
+  addLog(room,`${p.displayName} drew ${dis.length} card(s).`);
+  broadcastRoom(room.id);
+  const active=room.players.filter(p=>!p.folded);
+  if(active.every(p=>p.drawDone)){
+    active.forEach(p=>{p.drawDone=false;});
+    startBetting(room,'bet1');
+  }
+}
+function startBetting(room,phase) {
+  room.phase=phase;
+  room.currentBet=0;
+  room.players.forEach(p=>{p.bet=0;p.acted=false;});
+  room.currentTurn=room.players.findIndex(p=>!p.folded);
+  addLog(room,phase==='bet1'?'Betting round 1!':phase==='bet2'?'Singles revealed! Bet now.':'Final betting round!','imp');
+  broadcastRoom(room.id);
 }
 function playerBetAction(roomId,userId,action,amount) {
   const room=rooms[roomId];
@@ -290,106 +323,20 @@ function advanceTurn(room) {
     endBettingRound(room);
   } else {
     room.currentTurn=next;
+    broadcastRoom(room.id);
   }
   broadcastRoom(room.id);
 }
 function endBettingRound(room) {
-  if(room.gameType==='badugi'){
-    if(room.phase==='bbet'){
-      if(room.drawRound<3){
-        startBadugiDraw(room);
-      } else {
-        room.phase='decl';
-        room.currentTurn=room.players.findIndex(p=>!p.folded);
-        addLog(room,'Declare HIGH or LOW badugi!','imp');
-        broadcastRoom(room.id);
-      }
-    } else if(room.phase==='fbet'){
-      doBadugiShowdown(room);
-    }
-    return;
-  }
   if(room.phase==='bet1'){
     room.phase='bet2';
     addLog(room,'Singles revealed!','imp');
     startBetting(room,'bet2');
   } else if(room.phase==='bet2'){
-    room.phase='decl';
-    room.currentTurn=room.players.findIndex(p=>!p.folded);
     addLog(room,'FACTOR CARD IS LIVE! Declare: High, Low, or Swing!','imp');
     broadcastRoom(room.id);
   } else if(room.phase==='bet3'){
     doShowdown(room);
-  }
-}
-function startBetting(room,phase) {
-  room.phase=phase;
-  room.currentBet=0;
-  room.players.forEach(p=>{p.bet=0;p.acted=false;});
-  room.currentTurn=room.players.findIndex(p=>!p.folded);
-  addLog(room,phase==='bet1'?'Betting round 1!':phase==='bet2'?'Singles revealed! Bet now.':'Final betting round!','imp');
-  broadcastRoom(room.id);
-}
-function earlyWin(room) {
-  const alive=room.players.filter(p=>!p.folded);
-  if(alive.length===1){
-    const w=alive[0];
-    const rp=room.players.find(p=>p.userId===w.userId);
-    if(rp)rp.chips+=room.pot;
-    db.updateUser(w.userId,{chips:(db.findUser(u=>u.id===w.userId)||{chips:0}).chips+room.pot});
-    addLog(room,`${w.displayName} wins $${room.pot} — all folded!`,'win');
-    room.phase='showdown';
-    broadcastRoom(room.id);
-    setTimeout(()=>{
-      if(rooms[room.id]){
-        room.players.forEach(p=>{p.folded=false;p.decl=null;p.ready=false;p.drawDone=false;p.acted=false;});
-        startGame(room.id);
-      }
-    },5000);
-  }
-}
-function startGame(roomId) {
-  const room=rooms[roomId];
-  if(!room||room.players.length<2)return;
-  if(room.gameType==='badugi'){startBadugiGame(roomId);return;}
-  const deck=shuffle(makeDeck());
-  let idx=0;
-  const deal=n=>{const c=deck.slice(idx,idx+n);idx+=n;return c;};
-  room.deck=deck;room.pot=0;room.currentBet=0;
-  room.cols=Array.from({length:5},()=>({pair:deal(2),single:deal(1)[0]}));
-  room.players.forEach(p=>{
-    p.hand=deal(5);p.bet=0;p.folded=false;
-    p.decl=null;p.selectedDraw=[];p.ready=false;p.drawDone=false;p.acted=false;
-  });
-  room.deckIdx=idx;room.phase='ante';room.log=[];
-  addLog(room,'Fresh deck shuffled! Post your ante.','imp');
-  broadcastRoom(roomId);
-}
-function checkAllAnted(roomId) {
-  const room=rooms[roomId];
-  const active=room.players.filter(p=>!p.folded);
-  if(active.every(p=>p.ready)){
-    active.forEach(p=>{p.ready=false;});
-    room.phase='draw';
-    addLog(room,'Pick up to 2 cards to swap!','imp');
-    broadcastRoom(roomId);
-  }
-}
-function confirmDraw(room,userId,selected) {
-  const p=room.players.find(p=>p.userId===userId);
-  if(!p||p.drawDone)return;
-  const dis=[...selected].sort((a,b)=>b-a);
-  const nc=room.deck.slice(room.deckIdx,room.deckIdx+dis.length);
-  room.deckIdx+=dis.length;
-  dis.forEach(i=>p.hand.splice(i,1));
-  p.hand.push(...nc);
-  p.drawDone=true;
-  addLog(room,`${p.displayName} drew ${dis.length} card(s).`);
-  broadcastRoom(room.id);
-  const active=room.players.filter(p=>!p.folded);
-  if(active.every(p=>p.drawDone)){
-    active.forEach(p=>{p.drawDone=false;});
-    startBetting(room,'bet1');
   }
 }
 function playerDeclare(roomId,userId,decl) {
@@ -410,6 +357,10 @@ function playerDeclare(roomId,userId,decl) {
     room.currentTurn=next;
     broadcastRoom(room.id);
   }
+}
+function checkAllDeclared(room) {
+  const active=room.players.filter(p=>!p.folded);
+  if(active.every(p=>p.decl)){startBetting(room,'bet3');}
 }
 function doShowdown(room) {
   room.phase='showdown';
@@ -448,13 +399,17 @@ function doShowdown(room) {
     if(rp)rp.chips+=half;
     db.updateUser(hWin.userId,{chips:(db.findUser(u=>u.id===hWin.userId)||{chips:0}).chips+half,wins:(db.findUser(u=>u.id===hWin.userId)||{wins:0}).wins+1});
     addLog(room,`HIGH ($${half}): ${hWin.displayName} — ${hWin.best.high?hWin.best.high.n:'?'}`,'win');
-  } else {addLog(room,'HIGH POT: No winner.');}
+  } else {
+    addLog(room,'HIGH POT: No winner.');
+  }
   if(lWin){
     const rp=room.players.find(p=>p.userId===lWin.userId);
     if(rp)rp.chips+=half;
     db.updateUser(lWin.userId,{chips:(db.findUser(u=>u.id===lWin.userId)||{chips:0}).chips+half});
     addLog(room,`LOW ($${half}): ${lWin.displayName} — ${lWin.best.lowCards?lWin.best.lowCards.map(c=>c.v+c.s).join(' '):'?'}`,'win');
-  } else {addLog(room,'LOW POT: No qualified low hand.');}
+  } else {
+    addLog(room,'LOW POT: No qualified low hand.');
+  }
   addLog(room,`Factor Card: ${factor.v}${factor.s}`,'imp');
   broadcastRoom(room.id);
   setTimeout(()=>{
@@ -464,124 +419,25 @@ function doShowdown(room) {
     }
   },10000);
 }
-function startBadugiGame(roomId) {
-  const room=rooms[roomId];
-  if(!room||room.players.length<2)return;
-  const deck=shuffle(makeDeck());
-  let idx=0;
-  const deal=n=>{const c=deck.slice(idx,idx+n);idx+=n;return c;};
-  room.deck=deck;room.pot=0;room.currentBet=0;room.drawRound=0;
-  room.players.forEach(p=>{
-    p.hand=deal(4);p.bet=0;p.folded=false;
-    p.decl=null;p.selectedDraw=[];p.ready=false;p.drawDone=false;p.acted=false;
-  });
-  room.deckIdx=idx;room.phase='ante';room.log=[];
-  addLog(room,'Badugi! 4 cards dealt. Post your ante.','imp');
-  broadcastRoom(roomId);
-}
-function checkAllAntedBadugi(roomId) {
-  const room=rooms[roomId];
-  const active=room.players.filter(p=>!p.folded);
-  if(active.every(p=>p.ready)){
-    active.forEach(p=>{p.ready=false;});
-    startBadugiDraw(room);
-  }
-}
-function startBadugiDraw(room) {
-  room.drawRound=(room.drawRound||0)+1;
-  room.phase='draw';
-  room.players.forEach(p=>{if(!p.folded){p.drawDone=false;p.selectedDraw=[];}});
-  addLog(room,`Draw round ${room.drawRound} of 3 — swap any cards!`,'imp');
-  broadcastRoom(room.id);
-}
-function confirmBadugiDraw(room,userId,selected) {
-  const p=room.players.find(p=>p.userId===userId);
-  if(!p||p.drawDone)return;
-  const dis=[...selected].sort((a,b)=>b-a);
-  const nc=room.deck.slice(room.deckIdx,room.deckIdx+dis.length);
-  room.deckIdx+=dis.length;
-  dis.forEach(i=>p.hand.splice(i,1));
-  p.hand.push(...nc);
-  p.drawDone=true;
-  addLog(room,`${p.displayName} drew ${dis.length} card(s).`);
-  broadcastRoom(room.id);
-  const active=room.players.filter(p=>!p.folded);
-  if(active.every(p=>p.drawDone)){
-    active.forEach(p=>{p.drawDone=false;});
-    room.phase='bbet';
-    room.currentBet=0;
-    room.players.forEach(p=>{p.bet=0;p.acted=false;});
-    room.currentTurn=room.players.findIndex(p=>!p.folded);
-    addLog(room,`Betting round ${room.drawRound}!`,'imp');
+function earlyWin(room) {
+  const alive=room.players.filter(p=>!p.folded);
+  if(alive.length===1){
+    const w=alive[0];
+    const rp=room.players.find(p=>p.userId===w.userId);
+    if(rp)rp.chips+=room.pot;
+    db.updateUser(w.userId,{chips:(db.findUser(u=>u.id===w.userId)||{chips:0}).chips+room.pot});
+    addLog(room,`${w.displayName} wins $${room.pot} — all folded!`,'win');
+    room.phase='showdown';
     broadcastRoom(room.id);
+    setTimeout(()=>{
+      if(rooms[room.id]){
+        room.players.forEach(p=>{p.folded=false;p.decl=null;p.ready=false;p.drawDone=false;p.acted=false;});
+        startGame(room.id);
+      }
+    },5000);
   }
 }
-function playerDeclareBadugi(roomId,userId,decl) {
-  const room=rooms[roomId];
-  if(!room||room.phase!=='decl')return;
-  if(!['high','low'].includes(decl))return;
-  const pIdx=room.players.findIndex(p=>p.userId===userId);
-  if(pIdx!==room.currentTurn)return;
-  const p=room.players[pIdx];
-  if(!p||p.folded||p.decl)return;
-  p.decl=decl;
-  addLog(room,`${p.displayName} declares ${decl.toUpperCase()}!`,'imp');
-  const active=room.players.filter(p=>!p.folded);
-  if(active.every(p=>p.decl)){
-    room.phase='fbet';
-    room.currentBet=0;
-    room.players.forEach(p=>{p.bet=0;p.acted=false;});
-    room.currentTurn=room.players.findIndex(p=>!p.folded);
-    addLog(room,'Final betting round!','imp');
-    broadcastRoom(room.id);
-  } else {
-    let next=(room.currentTurn+1)%room.players.length;
-    while(room.players[next].folded) next=(next+1)%room.players.length;
-    room.currentTurn=next;
-    broadcastRoom(room.id);
-  }
-}
-function doBadugiShowdown(room) {
-  room.phase='showdown';
-  const active=room.players.filter(p=>!p.folded);
-  const highP=active.filter(p=>p.decl==='high');
-  const lowP=active.filter(p=>p.decl==='low');
-  let hWin=null,lWin=null;
-  if(highP.length){
-    const valid=highP.filter(p=>isBadugi(p.hand));
-    if(valid.length){
-      valid.sort((a,b)=>cmpBadugiHigh(evalBadugiHigh(a.hand),evalBadugiHigh(b.hand)));
-      hWin=valid[0];
-    }
-  }
-  if(lowP.length){
-    const valid=lowP.filter(p=>isBadugi(p.hand));
-    if(valid.length){
-      valid.sort((a,b)=>cmpBadugiLow(evalBadugiLow(a.hand),evalBadugiLow(b.hand)));
-      lWin=valid[0];
-    }
-  }
-  const half=Math.floor(room.pot/2);
-  if(hWin){
-    const rp=room.players.find(p=>p.userId===hWin.userId);
-    if(rp)rp.chips+=half;
-    db.updateUser(hWin.userId,{chips:(db.findUser(u=>u.id===hWin.userId)||{chips:0}).chips+half,wins:(db.findUser(u=>u.id===hWin.userId)||{wins:0}).wins+1});
-    addLog(room,`HIGH ($${half}): ${hWin.displayName} — ${hWin.hand.map(c=>c.v+c.s).join(' ')}`,'win');
-  } else {addLog(room,'HIGH: No valid badugi — no winner.');}
-  if(lWin){
-    const rp=room.players.find(p=>p.userId===lWin.userId);
-    if(rp)rp.chips+=half;
-    db.updateUser(lWin.userId,{chips:(db.findUser(u=>u.id===lWin.userId)||{chips:0}).chips+half});
-    addLog(room,`LOW ($${half}): ${lWin.displayName} — ${lWin.hand.map(c=>c.v+c.s).join(' ')}`,'win');
-  } else {addLog(room,'LOW: No valid badugi — no winner.');}
-  broadcastRoom(room.id);
-  setTimeout(()=>{
-    if(rooms[room.id]){
-      room.players.forEach(p=>{p.folded=false;p.decl=null;p.ready=false;p.drawDone=false;p.acted=false;});
-      startBadugiGame(room.id);
-    }
-  },10000);
-}
+
 io.on('connection',socket=>{
   socket.on('auth',({token})=>{
     try{
@@ -593,18 +449,18 @@ io.on('connection',socket=>{
       socket.emit('authOk',safeUser(user));
     }catch{socket.emit('authError','Invalid token');}
   });
-  socket.on('joinPublic',({gameType})=>{
+  socket.on('joinPublic',()=>{
     const u=socketUser[socket.id];
     if(!u){socket.emit('lobbyError','Not signed in.');return;}
     leaveCurrentRoom(socket);
-    const room=publicRoom(gameType||'chaingang');
+    const room=publicRoom();
     joinRoom(socket,room,u);
   });
-  socket.on('createPrivate',({gameType})=>{
+  socket.on('createPrivate',()=>{
     const u=socketUser[socket.id];
     if(!u){socket.emit('lobbyError','Not signed in.');return;}
     leaveCurrentRoom(socket);
-    const room=createRoom(true,gameType||'chaingang');
+    const room=createRoom(true);
     joinRoom(socket,room,u);
     socket.emit('privateCode',room.id);
   });
@@ -628,8 +484,7 @@ io.on('connection',socket=>{
     p.chips-=room.ante;room.pot+=room.ante;p.ready=true;
     addLog(room,`${p.displayName} posted ante.`);
     broadcastRoom(socket.roomId);
-    if(room.gameType==='badugi')checkAllAntedBadugi(socket.roomId);
-    else checkAllAnted(socket.roomId);
+    checkAllAnted(socket.roomId);
   });
   socket.on('selectDraw',({selected})=>{
     const u=socketUser[socket.id];
@@ -638,7 +493,7 @@ io.on('connection',socket=>{
     if(!room||room.phase!=='draw')return;
     const p=room.players.find(p=>p.userId===u.userId);
     if(!p)return;
-    p.selectedDraw=(selected||[]).slice(0,room.gameType==='badugi'?4:2);
+    p.selectedDraw=(selected||[]).slice(0,2);
     broadcastRoom(socket.roomId);
   });
   socket.on('confirmDraw',({selected})=>{
@@ -646,30 +501,18 @@ io.on('connection',socket=>{
     if(!u)return;
     const room=rooms[socket.roomId];
     if(!room||room.phase!=='draw')return;
-    if(room.gameType==='badugi')confirmBadugiDraw(room,u.userId,selected||[]);
-    else confirmDraw(room,u.userId,selected||[]);
+    confirmDraw(room,u.userId,selected||[]);
   });
   socket.on('betAction',({action,amount})=>{
     const u=socketUser[socket.id];
     if(!u)return;
-    const room=rooms[socket.roomId];
-    if(!room)return;
-    if(['bet1','bet2','bet3','bbet','fbet'].includes(room.phase)){
-      playerBetAction(socket.roomId,u.userId,action,amount);
-    }
+    playerBetAction(socket.roomId,u.userId,action,amount);
   });
   socket.on('declare',({decl})=>{
     const u=socketUser[socket.id];
     if(!u)return;
-    const room=rooms[socket.roomId];
-    if(!room||room.phase!=='decl')return;
-    if(room.gameType==='badugi'){
-      if(!['high','low'].includes(decl))return;
-      playerDeclareBadugi(socket.roomId,u.userId,decl);
-    } else {
-      if(!['high','low','swing'].includes(decl))return;
-      playerDeclare(socket.roomId,u.userId,decl);
-    }
+    if(!['high','low','swing'].includes(decl))return;
+    playerDeclare(socket.roomId,u.userId,decl);
   });
   socket.on('chat',({msg})=>{
     const u=socketUser[socket.id];
@@ -710,7 +553,7 @@ io.on('connection',socket=>{
     });
     socket.join(room.id);
     socket.roomId=room.id;
-    socket.emit('joinedRoom',{roomId:room.id,isPrivate:room.isPrivate,gameType:room.gameType});
+    socket.emit('joinedRoom',{roomId:room.id,isPrivate:room.isPrivate});
     addLog(room,`${u.displayName} joined the table.`,'imp');
     broadcastRoom(room.id);
     if(room.players.length>=2&&room.phase==='waiting'){
@@ -720,4 +563,4 @@ io.on('connection',socket=>{
 });
 
 app.get('*path',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
-server.listen(PORT,'0.0.0.0',()=>console.log(`Chain Gang Poker running on port ${PORT}`));
+server.listen(PORT, '0.0.0.0',()=>console.log(`Chain Gang Poker running on port ${PORT}`));
