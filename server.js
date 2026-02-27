@@ -260,18 +260,12 @@ function checkAllAnted(roomId) {
     room.phase='pairs';
     addLog(room,'Pairs on the board!','imp');
     broadcastRoom(roomId);
-    setTimeout(()=>{
-      room.phase='draw';
-      addLog(room,'Pick up to 2 cards to swap. 30 seconds!','imp');
-      broadcastRoom(roomId);
-      room.drawTimeout=setTimeout(()=>autoConfirmDraws(roomId),30000);
-    },2000);
+  if(active.every(p=>p.ready)){
+    active.forEach(p=>{p.ready=false;});
+    room.phase='draw';
+    addLog(room,'Pick up to 2 cards to swap!','imp');
+    broadcastRoom(roomId);
   }
-}
-function autoConfirmDraws(roomId) {
-  const room=rooms[roomId];
-  if(room.phase!=='draw')return;
-  room.players.forEach(p=>{if(!p.folded&&!p.drawDone)confirmDraw(room,p.userId,[]);});
 }
 function confirmDraw(room,userId,selected) {
   const p=room.players.find(p=>p.userId===userId);
@@ -286,7 +280,6 @@ function confirmDraw(room,userId,selected) {
   broadcastRoom(room.id);
   const active=room.players.filter(p=>!p.folded);
   if(active.every(p=>p.drawDone)){
-    clearTimeout(room.drawTimeout);
     active.forEach(p=>{p.drawDone=false;});
     startBetting(room,'bet1');
   }
@@ -298,17 +291,6 @@ function startBetting(room,phase) {
   room.currentTurn=room.players.findIndex(p=>!p.folded);
   addLog(room,phase==='bet1'?'Betting round 1!':phase==='bet2'?'Singles revealed! Bet now.':'Final betting round!','imp');
   broadcastRoom(room.id);
-  room.betTimeout=setTimeout(()=>autoFold(room.id),30000);
-}
-function autoFold(roomId) {
-  const room=rooms[roomId];
-  if(!['bet1','bet2','bet3'].includes(room.phase))return;
-  const p=room.players[room.currentTurn];
-  if(p&&!p.folded&&!p.acted){
-    p.folded=true;
-    addLog(room,`${p.displayName} timed out.`);
-    advanceTurn(room);
-  }
 }
 function playerBetAction(roomId,userId,action,amount) {
   const room=rooms[roomId];
@@ -317,7 +299,6 @@ function playerBetAction(roomId,userId,action,amount) {
   if(pIdx!==room.currentTurn)return;
   const p=room.players[pIdx];
   if(p.folded||p.acted)return;
-  clearTimeout(room.betTimeout);
   if(action==='fold'){p.folded=true;addLog(room,`${p.displayName} folds.`);}
   else if(action==='check'){if(room.currentBet>0)return;addLog(room,`${p.displayName} checks.`);}
   else if(action==='call'){
@@ -348,32 +329,21 @@ function advanceTurn(room) {
   } else {
     room.currentTurn=next;
     broadcastRoom(room.id);
-    room.betTimeout=setTimeout(()=>autoFold(room.id),30000);
   }
   broadcastRoom(room.id);
 }
 function endBettingRound(room) {
-  clearTimeout(room.betTimeout);
   if(room.phase==='bet1'){
     room.phase='bet2';
     addLog(room,'Singles revealed!','imp');
-    broadcastRoom(room.id);
-    setTimeout(()=>startBetting(room,'bet2'),1500);
+    startBetting(room,'bet2');
   } else if(room.phase==='bet2'){
     room.phase='decl';
-    room.declDeadline=Date.now()+30000;
     addLog(room,'FACTOR CARD IS LIVE! Declare: High, Low, or Swing!','imp');
     broadcastRoom(room.id);
-    room.declTimeout=setTimeout(()=>autoDecl(room.id),30000);
   } else if(room.phase==='bet3'){
     doShowdown(room);
   }
-}
-function autoDecl(roomId) {
-  const room=rooms[roomId];
-  if(room.phase!=='decl')return;
-  room.players.forEach(p=>{if(!p.folded&&!p.decl){p.decl='high';addLog(room,`${p.displayName} timed out — declared HIGH.`);}});
-  checkAllDeclared(room);
 }
 function playerDeclare(roomId,userId,decl) {
   const room=rooms[roomId];
@@ -387,9 +357,8 @@ function playerDeclare(roomId,userId,decl) {
 }
 function checkAllDeclared(room) {
   const active=room.players.filter(p=>!p.folded);
-  if(active.every(p=>p.decl)){clearTimeout(room.declTimeout);startBetting(room,'bet3');}
+  if(active.every(p=>p.decl)){startBetting(room,'bet3');}
 }
-
 function doShowdown(room) {
   room.phase='showdown';
   const factor=room.cols[2].single;
