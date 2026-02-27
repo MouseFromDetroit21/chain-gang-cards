@@ -139,33 +139,21 @@ function combos(arr,k) {
   go(0,[]);return res;
 }
 function bestHand(hole,cols) {
-  const pC=cols.flatMap(col=>col.pair.map(c=>({card:c,t:'p'})));
-  const sC=cols.map(col=>({card:col.single,t:'s'}));
-  const all=[...pC,...sC];
+  const availPairs=cols.map((col,i)=>({cards:col.pair,colIdx:i})).filter(c=>c.cards&&c.cards[0]&&c.cards[1]);
+  const availSingles=cols.map((col,i)=>({card:col.single,colIdx:i})).filter(c=>c.card);
+  if(availPairs.length===0||availSingles.length===0) return{high:null,highCards:[],low:null,lowCards:[]};
   let bH=null,bHC=[],bL=null,bLC=[];
-  for(let k=0;k<=Math.min(5,all.length);k++){
-    const hn=5-k;if(hn>hole.length||hn<0)continue;
-    let cSubs;
-    if(k===0){cSubs=[[]];}
-    else{
-      cSubs=[];
-      const go=(s,cur)=>{
-        if(cur.length===k){
-          if(cur.some(c=>c.t==='p')&&cur.some(c=>c.t==='s'))cSubs.push([...cur]);
-          return;
-        }
-        for(let i=s;i<all.length;i++){cur.push(all[i]);go(i+1,cur);cur.pop();}
-      };
-      go(0,[]);
-    }
-    const hS=combos(hole,hn);
-    for(const cs of cSubs)for(const hs of hS){
-      const h=[...hs,...cs.map(c=>c.card)];
-      if(h.length!==5)continue;
-      const hr=evalHigh(h);
-      if(!bH||cmpHigh(hr,bH)<0){bH=hr;bHC=h;}
-      const lr=evalLow(h);
-      if(lr&&(!bL||cmpLow(lr,bL)<0)){bL=lr;bLC=h;}
+  const holeCombos=combos(hole,2);
+  for(const hc of holeCombos){
+    for(const pair of availPairs){
+      for(const single of availSingles){
+        const hand=[...hc,...pair.cards,single.card];
+        if(hand.length!==5)continue;
+        const hr=evalHigh(hand);
+        if(!bH||cmpHigh(hr,bH)<0){bH=hr;bHC=hand;}
+        const lr=evalLow(hand);
+        if(lr&&(!bL||cmpLow(lr,bL)<0)){bL=lr;bLC=hand;}
+      }
     }
   }
   return{high:bH,highCards:bHC,low:bL,lowCards:bLC};
