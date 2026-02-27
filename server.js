@@ -217,7 +217,7 @@ function sanitizeForPlayer(room,userId) {
     players:room.players.map(p=>({
       userId:p.userId,username:p.username,displayName:p.displayName,
       avatar:p.avatar,chips:p.chips,bet:p.bet,folded:p.folded,
-      decl:p.decl,cardCount:p.hand?p.hand.length:0,
+      decl:room.phase==='showdown'||p.userId===userId?p.decl:p.decl?'hidden':null,cardCount:p.hand?p.hand.length:0,
       isMe:p.userId===userId,ready:p.ready,acted:p.acted
     })),
     currentTurn:room.currentTurn,winner:room.winner||null
@@ -333,7 +333,6 @@ function endBettingRound(room) {
     addLog(room,'Singles revealed!','imp');
     startBetting(room,'bet2');
   } else if(room.phase==='bet2'){
-    room.phase='decl';
     addLog(room,'FACTOR CARD IS LIVE! Declare: High, Low, or Swing!','imp');
     broadcastRoom(room.id);
   } else if(room.phase==='bet3'){
@@ -343,12 +342,21 @@ function endBettingRound(room) {
 function playerDeclare(roomId,userId,decl) {
   const room=rooms[roomId];
   if(!room||room.phase!=='decl')return;
-  const p=room.players.find(p=>p.userId===userId);
+  const pIdx=room.players.findIndex(p=>p.userId===userId);
+  if(pIdx!==room.currentTurn)return;
+  const p=room.players[pIdx];
   if(!p||p.folded||p.decl)return;
   p.decl=decl;
   addLog(room,`${p.displayName} declares ${decl.toUpperCase()}!`,'imp');
-  broadcastRoom(room.id);
-  checkAllDeclared(room);
+  const active=room.players.filter(p=>!p.folded);
+  if(active.every(p=>p.decl)){
+    startBetting(room,'bet3');
+  } else {
+    let next=(room.currentTurn+1)%room.players.length;
+    while(room.players[next].folded) next=(next+1)%room.players.length;
+    room.currentTurn=next;
+    broadcastRoom(room.id);
+  }
 }
 function checkAllDeclared(room) {
   const active=room.players.filter(p=>!p.folded);
