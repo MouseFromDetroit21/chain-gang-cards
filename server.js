@@ -377,6 +377,15 @@ function checkAllAnted(roomId) {
     broadcastRoom(roomId);
   }
 }
+function checkAllAntedBadugi(roomId) {
+  const room=rooms[roomId];
+  if(!room)return;
+  const active=room.players.filter(p=>!p.folded);
+  if(active.every(p=>p.ready)){
+    active.forEach(p=>{p.ready=false;});
+    startBadugiDraw(room);
+  }
+}
 function confirmDraw(room,userId,selected) {
   const p=room.players.find(p=>p.userId===userId);
   if(!p||p.drawDone)return;
