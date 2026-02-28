@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>How to Play — Chain Gang Poker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold: #d4a017;
+  --teal: #22ccaa;
+  --bg: #060d06;
+  --bg2: #0a130a;
+  --bg3: #0d1a0d;
+  --border: #1a2a1a;
+  --text: #f0e6c8;
+  --muted: #667766;
+  --red: #cc3322;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Crimson Pro', Georgia, serif;
+  font-size:18px;
+  line-height:1.6;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+body::before {
+  content:'';
+  position:fixed;
+  inset:0;
+  background:repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events:none;
+  z-index:1000;
+}
+.site-header {
+  text-align:center;
+  padding:60px 20px 40px;
+  position:relative;
+  border-bottom:1px solid var(--border);
+}
+.site-header::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  background:radial-gradient(ellipse at 50% 0%, rgba(212,160,23,0.08) 0%, transparent 70%);
+  pointer-events:none;
+}
+.back-link {
+  position:absolute;
+  top:20px;
+  left:20px;
+  color:var(--muted);
+  font-size:0.8rem;
+  letter-spacing:2px;
+  text-decoration:none;
+  font-family:'Bebas Neue', sans-serif;
+  transition:color 0.2s;
+}
+.back-link:hover { color:var(--gold); }
+.site-header h1 {
+  font-family:'Bebas Neue', sans-serif;
+  font-size:clamp(3rem, 10vw, 6rem);
+  color:var(--gold);
+  letter-spacing:8px;
+  text-shadow:0 0 40px rgba(212,160,23,0.3);
+  line-height:1;
+}
+.site-header .subtitle {
+  font-size:0.75rem;
+  letter-spacing:6px;
+  color:var(--muted);
+  margin-top:8px;
+  font-family:'Bebas Neue', sans-serif;
+}
+.game-nav {
+  display:flex;
+  justify-content:center;
+  gap:0;
+  border-bottom:2px solid var(--border);
+  position:sticky;
+  top:0;
+  background:rgba(6,13,6,0.95);
+  backdrop-filter:blur(10px);
+  z-index:100;
+}
+.nav-tab {
+  padding:16px 32px;
+  font-family:'Bebas Neue', sans-serif;
+  font-size:1.2rem;
+  letter-spacing:3px;
+  color:var(--muted);
+  cursor:pointer;
+  border-bottom:3px solid transparent;
+  margin-bottom:-2px;
+  transition:all 0.2s;
+}
+.nav-tab:hover { color:var(--text); }
+.nav-tab.active { color:var(--gold); border-bottom-color:var(--gold); }
+.nav-tab.badugi-tab.active { color:var(--teal); border-bottom-color:var(--teal); }
+.game-section { display:none; max-width:720px; margin:0 auto; padding:40px 20px 80px; }
+.game-section.active { display:block; }
+.overview {
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:28px;
+  margin-bottom:36px;
+  position:relative;
+  overflow:hidden;
+}
+.overview::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.overview.badugi-overview::before {
+  background:linear-gradient(90deg, transparent, var(--teal), transparent);
+}
+.overview h2 {
+  font-family:'Bebas Neue', sans-serif;
+  font-size:2rem;
+  letter-spacing:4px;
+  color:var(--gold);
+  margin-bottom:12px;
+}
+.overview.badugi-overview h2 { color:var(--teal); }
+.overview p { color:#b0a890; font-size:1rem; line-height:1.7; }
+.overview .quick-facts {
+  display:flex;
+  gap:16px;
+  margin-top:20px;
+  flex-wrap:wrap;
+}
+.fact {
+  background:rgba(0,0,0,0.3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px 16px;
+  text-align:center;
+  flex:1;
+  min-width:100px;
+}
+.fact .fact-val {
+  font-family:'Bebas Neue', sans-serif;
+  font-size:1.6rem;
+  color:var(--gold);
+  line-height:1;
+}
+.badugi-overview .fact .fact-val { color:var(--teal); }
+.fact .fact-label { font-size:0.65rem; color:var(--muted); letter-spacing:2px; margin-top:4px; }
+.playthrough-header {
+  font-family:'Bebas Neue', sans-serif;
+  font-size:1.6rem;
+  letter-spacing:4px;
+  color:var(--gold);
+  margin:40px 0 20px;
+  padding-bottom:8px;
+  border-bottom:1px solid var(--border);
+}
+.badugi-color { color:var(--teal); }
+.step {
+  display:flex;
+  gap:20px;
+  margin-bottom:8px;
+  position:relative;
+}
+.step-connector {
+  position:absolute;
+  left:19px;
+  top:44px;
+  bottom:-8px;
+  width:2px;
+  background:linear-gradient(to bottom, var(--border), transparent);
+}
+.step-num {
+  width:40px;
+  height:40px;
+  min-width:40px;
+  border-radius:50%;
+  background:var(--bg3);
+  border:2px solid var(--gold);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:'Bebas Neue', sans-serif;
+  font-size:1.1rem;
+  color:var(--gold);
+  margin-top:2px;
+  position:relative;
+  z-index:1;
+}
+.step-num.teal { border-color:var(--teal); color:var(--teal); }
+.step-body {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:18px 20px;
+  flex:1;
+  margin-bottom:20px;
+}
+.step-body h3 {
+  font-family:'Bebas Neue', sans-serif;
+  font-size:1.2rem;
+  letter-spacing:3px;
+  color:var(--gold);
+  margin-bottom:8px;
+}
+.step-body h3.teal { color:var(--teal); }
+.step-body p { color:#b0a890; font-size:0.95rem; line-height:1.7; }
+.step-body .example {
+  background:rgba(0,0,0,0.4);
+  border-left:3px solid var(--gold);
+  border-radius:0 6px 6px 0;
+  padding:12px 14px;
+  margin-top:12px;
+  font-size:0.875rem;
+  color:#d4c8a0;
+  font-style:italic;
+}
+.step-body .example.teal-border { border-left-color:var(--teal); }
+.card-demo {
+  display:flex;
+  gap:8px;
+  margin-top:14px;
+  flex-wrap:wrap;
+}
+.demo-card {
+  width:48px;
+  height:66px;
+  background:#f5f0e8;
+  border-radius:6px;
+  border:1px solid #ccc;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  font-size:0.75rem;
+  font-weight:700;
+  color:#111;
+  font-family:Arial,sans-serif;
+  position:relative;
+  padding:3px;
+}
+.demo-card.red { color:#cc0000; }
+.demo-card.back {
+  background:repeating-linear-gradient(45deg,#1a0a2a,#1a0a2a 4px,#2a1a3a 4px,#2a1a3a 8px);
+  border-color:#333;
+}
+.demo-card .cv { font-size:1rem; font-weight:900; }
+.demo-card .cs { font-size:0.8rem; }
+.demo-card.selected { outline:3px solid var(--gold); }
+.demo-card.selected.teal { outline-color:var(--teal); }
+.demo-card.winner { outline:3px solid #4dff88; box-shadow:0 0 10px rgba(77,255,136,0.3); }
+.card-label {
+  font-size:0.65rem;
+  color:var(--muted);
+  letter-spacing:1px;
+  text-align:center;
+  margin-top:4px;
+}
+.board-demo {
+  background:#0a150a;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px;
+  margin-top:12px;
+}
+.board-demo-label {
+  font-size:0.6rem;
+  letter-spacing:2px;
+  color:var(--muted);
+  margin-bottom:8px;
+  font-family:'Bebas Neue', sans-serif;
+}
+.board-cols {
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+.board-col {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+}
+.board-col-label {
+  font-size:0.55rem;
+  color:#444;
+  letter-spacing:1px;
+  font-family:'Bebas Neue', sans-serif;
+}
+.board-col-pair { display:flex; gap:3px; }
+.declare-options {
+  display:flex;
+  gap:10px;
+  margin-top:12px;
+  flex-wrap:wrap;
+}
+.decl-btn {
+  flex:1;
+  min-width:80px;
+  padding:10px;
+  border-radius:8px;
+  text-align:center;
+  border:2px solid;
+  font-family:'Bebas Neue', sans-serif;
+  font-size:1rem;
+  letter-spacing:2px;
+}
+.decl-high { border-color:#1a8a3a; background:#0a1a0a; color:#4dff88; }
+.decl-low { border-color:#1155aa; background:#0a0a1a; color:#88aaff; }
+.decl-swing { border-color:#772299; background:#150a1a; color:#cc88ff; }
+.scoring-table {
+  width:100%;
+  border-collapse:collapse;
+  margin-top:12px;
+  font-size:0.9rem;
+}
+.scoring-table th {
+  font-family:'Bebas Neue', sans-serif;
+  letter-spacing:2px;
+  font-size:0.8rem;
+  color:var(--muted);
+  padding:8px 12px;
+  border-bottom:1px solid var(--border);
+  text-align:left;
+}
+.scoring-table td {
+  padding:8px 12px;
+  border-bottom:1px solid rgba(26,42,26,0.5);
+  color:#b0a890;
+}
+.scoring-table tr:hover td { background:rgba(255,255,255,0.02); }
+.hand-rank { color:var(--gold); font-weight:600; }
+.tips-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:12px;
+}
+@media(max-width:500px) { .tips-grid { grid-template-columns:1fr; } }
+.tip-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px;
+}
+.tip-card .tip-icon { font-size:1.5rem; margin-bottom:8px; }
+.tip-card h4 {
+  font-family:'Bebas Neue', sans-serif;
+  letter-spacing:2px;
+  color:var(--gold);
+  margin-bottom:6px;
+  font-size:1rem;
+}
+.tip-card.teal h4 { color:var(--teal); }
+.tip-card p { font-size:0.82rem; color:var(--muted); line-height:1.5; }
+.warning-box {
+  background:#1a0808;
+  border:1px solid #441111;
+  border-radius:10px;
+  padding:16px 20px;
+  margin-top:14px;
+}
+.warning-box h4 {
+  font-family:'Bebas Neue', sans-serif;
+  color:var(--red);
+  letter-spacing:2px;
+  margin-bottom:6px;
+}
+.warning-box p { font-size:0.875rem; color:#cc9988; line-height:1.6; }
+.rollover-box {
+  background:#001a10;
+  border:1px solid #115533;
+  border-radius:10px;
+  padding:16px 20px;
+  margin-top:14px;
+}
+.rollover-box h4 {
+  font-family:'Bebas Neue', sans-serif;
+  color:var(--teal);
+  letter-spacing:2px;
+  margin-bottom:6px;
+}
+.rollover-box p { font-size:0.875rem; color:#88ccaa; line-height:1.6; }
+.phase-pill {
+  display:inline-block;
+  padding:3px 10px;
+  border-radius:20px;
+  font-family:'Bebas Neue', sans-serif;
+  font-size:0.75rem;
+  letter-spacing:2px;
+  background:#1a3a1a;
+  color:#4dff88;
+  margin-right:6px;
+}
+.phase-pill.teal { background:#001a15; color:var(--teal); }
+.phase-pill.gold { background:#1a1400; color:var(--gold); }
+.phase-pill.red { background:#1a0808; color:#ff8866; }
+.page-footer {
+  text-align:center;
+  padding:40px 20px;
+  border-top:1px solid var(--border);
+  color:var(--muted);
+  font-size:0.75rem;
+  letter-spacing:2px;
+  font-family:'Bebas Neue', sans-serif;
+}
+.play-btn {
+  display:inline-block;
+  margin-top:20px;
+  padding:14px 40px;
+  background:var(--gold);
+  color:#000;
+  font-family:'Bebas Neue', sans-serif;
+  font-size:1.2rem;
+  letter-spacing:4px;
+  border-radius:8px;
+  text-decoration:none;
+  transition:opacity 0.2s;
+}
+.play-btn:hover { opacity:0.85; }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a href="/" class="back-link">← BACK TO GAME</a>
+  <h1>⛓ CHAIN GANG ⛓</h1>
+  <p class="subtitle">PLAYER'S GUIDE & RULES</p>
+</header>
+
+<nav class="game-nav">
+  <div class="nav-tab active" onclick="showGame('chaingang',this)">⛓ CHAIN GANG</div>
+  <div class="nav-tab badugi-tab" onclick="showGame('badugi',this)">🎴 BADUGI</div>
+</nav>
+
+<section class="game-section active" id="section-chaingang">
+  <div class="overview">
+    <h2>CHAIN GANG POKER</h2>
+    <p>A five-card draw game played against a shared community board. You use 2 of your hole cards, one pair from the board, and one single to make your best 5-card hand. At the end you declare whether you're going for the HIGH pot, LOW pot, or both with a SWING. The pot splits between the best high hand and the best qualifying low hand.</p>
+    <div class="quick-facts">
+      <div class="fact"><div class="fact-val">5</div><div class="fact-label">HOLE CARDS</div></div>
+      <div class="fact"><div class="fact-val">5</div><div class="fact-label">BOARD COLS</div></div>
+      <div class="fact"><div class="fact-val">3</div><div class="fact-label">BET ROUNDS</div></div>
+      <div class="fact"><div class="fact-val">2</div><div class="fact-label">POTS</div></div>
+    </div>
+  </div>
+
+  <div class="playthrough-header">HOW A HAND PLAYS OUT</div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3>ANTE UP <span class="phase-pill gold">ANTE</span></h3>
+      <p>Every player posts a small ante ($10) to build the pot before cards are dealt. This is mandatory — you can't see your hand until you pay in.</p>
+      <div class="example">💡 Think of the ante as your buy-in for that hand. Everyone has skin in the game from the start.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3>CARDS ARE DEALT</h3>
+      <p>You receive <strong>5 hole cards</strong> — these are yours alone. Simultaneously the community board is set up: <strong>5 columns</strong>, each with a face-up pair and one face-down single card.</p>
+      <div class="board-demo">
+        <div class="board-demo-label">COMMUNITY BOARD — PAIRS VISIBLE, SINGLES HIDDEN</div>
+        <div class="board-cols">
+          <div class="board-col">
+            <div class="board-col-label">COL 1</div>
+            <div class="board-col-pair">
+              <div class="demo-card red"><div class="cv">K</div><div class="cs">♥</div></div>
+              <div class="demo-card"><div class="cv">K</div><div class="cs">♠</div></div>
+            </div>
+            <div class="demo-card back"></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 2</div>
+            <div class="board-col-pair">
+              <div class="demo-card"><div class="cv">7</div><div class="cs">♣</div></div>
+              <div class="demo-card red"><div class="cv">7</div><div class="cs">♦</div></div>
+            </div>
+            <div class="demo-card back"></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 3 ⭐</div>
+            <div class="board-col-pair">
+              <div class="demo-card red"><div class="cv">A</div><div class="cs">♦</div></div>
+              <div class="demo-card"><div class="cv">A</div><div class="cs">♠</div></div>
+            </div>
+            <div class="demo-card back"></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 4</div>
+            <div class="board-col-pair">
+              <div class="demo-card"><div class="cv">J</div><div class="cs">♣</div></div>
+              <div class="demo-card red"><div class="cv">J</div><div class="cs">♥</div></div>
+            </div>
+            <div class="demo-card back"></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 5</div>
+            <div class="board-col-pair">
+              <div class="demo-card"><div class="cv">3</div><div class="cs">♠</div></div>
+              <div class="demo-card red"><div class="cv">3</div><div class="cs">♥</div></div>
+            </div>
+            <div class="demo-card back"></div>
+          </div>
+        </div>
+      </div>
+      <div class="example">💡 Col 3 is special — its single card is the FACTOR CARD, revealed last and used to break low hand ties.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3>DRAW PHASE <span class="phase-pill">DRAW</span></h3>
+      <p>Swap <strong>up to 2 of your hole cards</strong> for new ones. Tap the cards you want to replace then confirm. You can keep all 5 if your hand is good.</p>
+      <div class="card-demo">
+        <div><div class="demo-card red"><div class="cv">2</div><div class="cs">♥</div></div><div class="card-label">KEEP</div></div>
+        <div><div class="demo-card selected"><div class="cv">9</div><div class="cs">♣</div></div><div class="card-label">SWAP</div></div>
+        <div><div class="demo-card red"><div class="cv">A</div><div class="cs">♦</div></div><div class="card-label">KEEP</div></div>
+        <div><div class="demo-card selected"><div class="cv">6</div><div class="cs">♠</div></div><div class="card-label">SWAP</div></div>
+        <div><div class="demo-card"><div class="cv">4</div><div class="cs">♣</div></div><div class="card-label">KEEP</div></div>
+      </div>
+      <div class="example">💡 Gold outline = selected for swap. Max 2 cards. Everyone draws simultaneously before betting starts.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3>BETTING ROUND 1 <span class="phase-pill">BET 1</span></h3>
+      <p>First betting round. <strong>Check</strong> (pass if no bet), <strong>Call</strong> (match current bet), <strong>Raise</strong> (increase the bet), or <strong>Fold</strong> (quit the hand). Only the board pairs are visible — singles still hidden.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3>SINGLES REVEALED <span class="phase-pill">BET 2</span></h3>
+      <p>All singles on the board flip face-up except Col 3 (Factor Card stays hidden). A second betting round begins — now you can see what low hands are possible.</p>
+      <div class="board-demo">
+        <div class="board-demo-label">SINGLES NOW VISIBLE — FACTOR CARD STILL HIDDEN</div>
+        <div class="board-cols">
+          <div class="board-col">
+            <div class="board-col-label">COL 1</div>
+            <div class="board-col-pair">
+              <div class="demo-card red"><div class="cv">K</div><div class="cs">♥</div></div>
+              <div class="demo-card"><div class="cv">K</div><div class="cs">♠</div></div>
+            </div>
+            <div class="demo-card red"><div class="cv">5</div><div class="cs">♦</div></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 2</div>
+            <div class="board-col-pair">
+              <div class="demo-card"><div class="cv">7</div><div class="cs">♣</div></div>
+              <div class="demo-card red"><div class="cv">7</div><div class="cs">♦</div></div>
+            </div>
+            <div class="demo-card"><div class="cv">2</div><div class="cs">♣</div></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 3 ⭐</div>
+            <div class="board-col-pair">
+              <div class="demo-card red"><div class="cv">A</div><div class="cs">♦</div></div>
+              <div class="demo-card"><div class="cv">A</div><div class="cs">♠</div></div>
+            </div>
+            <div class="demo-card back"></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 4</div>
+            <div class="board-col-pair">
+              <div class="demo-card"><div class="cv">J</div><div class="cs">♣</div></div>
+              <div class="demo-card red"><div class="cv">J</div><div class="cs">♥</div></div>
+            </div>
+            <div class="demo-card"><div class="cv">8</div><div class="cs">♣</div></div>
+          </div>
+          <div class="board-col">
+            <div class="board-col-label">COL 5</div>
+            <div class="board-col-pair">
+              <div class="demo-card"><div class="cv">3</div><div class="cs">♠</div></div>
+              <div class="demo-card red"><div class="cv">3</div><div class="cs">♥</div></div>
+            </div>
+            <div class="demo-card"><div class="cv">4</div><div class="cs">♠</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3>DECLARE <span class="phase-pill gold">DECLARE</span></h3>
+      <p>The <strong>Factor Card</strong> (Col 3 single) is revealed. Each player declares in turn order — hidden from others until all have declared.</p>
+      <div class="declare-options">
+        <div class="decl-btn decl-high">HIGH ⬆️<br><span style="font-size:0.65rem;opacity:0.7">Best poker hand wins half pot</span></div>
+        <div class="decl-btn decl-low">LOW ⬇️<br><span style="font-size:0.65rem;opacity:0.7">Best low hand wins half pot</span></div>
+        <div class="decl-btn decl-swing">SWING ↕️<br><span style="font-size:0.65rem;opacity:0.7">Must win BOTH to get anything</span></div>
+      </div>
+      <div class="warning-box">
+        <h4>⚠️ SWING RISK</h4>
+        <p>If you swing and win only one side you get <strong>nothing</strong> — not even the half you won. You must take both pots or walk away empty. Only swing when you're sure you can lock up both sides.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3>FINAL BETTING <span class="phase-pill">BET 3</span></h3>
+      <p>Last betting round after declarations are revealed. Now you know who went high, low, or swung — use that to decide how hard to push the pot.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">8</div>
+    <div class="step-body">
+      <h3>SHOWDOWN <span class="phase-pill">SHOWDOWN</span></h3>
+      <p>Pot splits evenly between best HIGH hand and best qualifying LOW hand.</p>
+      <div class="example" style="border-left-color:#4dff88;color:#88ffaa">
+        🏆 HIGH: Best 5-card poker hand among High or Swing declarers<br>
+        🏆 LOW: Best 5-card low hand (no pairs, A plays low) among Low or Swing declarers
+      </div>
+    </div>
+  </div>
+  <div class="playthrough-header">BUILDING YOUR 5-CARD HAND</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3>THE FORMULA</h3>
+    <p>Your hand is always: <strong>2 hole cards + 1 full pair from any board column + 1 single from any board column = 5 cards</strong></p>
+    <div class="example">Example: Hole cards A♠ 3♣. Board has K♥-K♠ pair in Col 1 and 5♦ single in Col 2. You play: A♠ + 3♣ + K♥ + K♠ + 5♦ = One Pair, Kings.</div>
+    <div class="example" style="margin-top:8px">💡 The game automatically finds your best possible hand from all legal combinations and shows it to you during play.</div>
+  </div>
+
+  <div class="playthrough-header">LOW HAND RULES</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3>WHAT QUALIFIES AS LOW</h3>
+    <p>A qualifying low hand must have <strong>5 different ranks</strong> — no pairs. Aces play low (value 1). Best possible low is A-2-3-4-5. Lower is better.</p>
+    <table class="scoring-table">
+      <tr><th>HAND</th><th>RANK</th><th>NOTES</th></tr>
+      <tr><td class="hand-rank">A-2-3-4-5</td><td>Best possible</td><td>The wheel</td></tr>
+      <tr><td class="hand-rank">A-2-3-4-6</td><td>2nd best</td><td></td></tr>
+      <tr><td class="hand-rank">A-2-3-5-6</td><td>3rd best</td><td></td></tr>
+      <tr><td class="hand-rank">9-8-7-6-5</td><td>Decent low</td><td>All different ranks</td></tr>
+      <tr><td class="hand-rank">K-Q-J-10-9</td><td>Worst qualifying</td><td>Still beats no low</td></tr>
+      <tr><td class="hand-rank">A-A-2-3-4</td><td>DOES NOT QUALIFY</td><td>Pair = no low</td></tr>
+    </table>
+    <div class="example">💡 The Factor Card (Col 3 single) breaks ties — the player whose low hand uses the Factor Card's suit wins.</div>
+  </div>
+
+  <div class="playthrough-header">HIGH HAND RANKINGS</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3>STANDARD POKER HANDS — BEST TO WORST</h3>
+    <table class="scoring-table">
+      <tr><th>RANK</th><th>HAND</th><th>EXAMPLE</th></tr>
+      <tr><td>1st</td><td class="hand-rank">Straight Flush</td><td>5♠ 6♠ 7♠ 8♠ 9♠</td></tr>
+      <tr><td>2nd</td><td class="hand-rank">Four of a Kind</td><td>K♠ K♥ K♦ K♣ 2♠</td></tr>
+      <tr><td>3rd</td><td class="hand-rank">Full House</td><td>Q♠ Q♥ Q♦ 7♠ 7♥</td></tr>
+      <tr><td>4th</td><td class="hand-rank">Flush</td><td>A♠ J♠ 8♠ 5♠ 2♠</td></tr>
+      <tr><td>5th</td><td class="hand-rank">Straight</td><td>7♠ 8♥ 9♦ 10♣ J♠</td></tr>
+      <tr><td>6th</td><td class="hand-rank">Three of a Kind</td><td>J♠ J♥ J♦ 4♠ 2♣</td></tr>
+      <tr><td>7th</td><td class="hand-rank">Two Pair</td><td>A♠ A♥ K♠ K♥ Q♠</td></tr>
+      <tr><td>8th</td><td class="hand-rank">One Pair</td><td>10♠ 10♥ A♠ K♠ 2♣</td></tr>
+      <tr><td>9th</td><td class="hand-rank">High Card</td><td>A♠ K♥ J♦ 7♣ 2♠</td></tr>
+    </table>
+  </div>
+
+  <div class="playthrough-header">STRATEGY TIPS</div>
+  <div class="tips-grid">
+    <div class="tip-card">
+      <div class="tip-icon">👀</div>
+      <h4>WATCH THE BOARD</h4>
+      <p>Pairs are visible from the start. High pairs = high hand potential. Low singles = low hand potential. Plan before the draw.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🎯</div>
+      <h4>COMMIT EARLY</h4>
+      <p>Decide high or low before declare if possible. Swing hands are rare — don't be greedy unless you have a monster on both sides.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🔒</div>
+      <h4>HIDDEN DECLARES</h4>
+      <p>You can't see others' declarations until all are in. Use your betting to disguise which direction you're heading.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">⭐</div>
+      <h4>FACTOR CARD</h4>
+      <p>In a low tie, whoever uses the Factor Card's suit wins. If going low, track whether your cards include that suit.</p>
+    </div>
+  </div>
+</section>
+  <div class="playthrough-header">BUILDING YOUR 5-CARD HAND</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3>THE FORMULA</h3>
+    <p>Your hand is always: <strong>2 hole cards + 1 full pair from any board column + 1 single from any board column = 5 cards</strong></p>
+    <div class="example">Example: Hole cards A♠ 3♣. Board has K♥-K♠ pair in Col 1 and 5♦ single in Col 2. You play: A♠ + 3♣ + K♥ + K♠ + 5♦ = One Pair, Kings.</div>
+    <div class="example" style="margin-top:8px">💡 The game automatically finds your best possible hand from all legal combinations and shows it to you during play.</div>
+  </div>
+  <div class="playthrough-header">LOW HAND RULES</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3>WHAT QUALIFIES AS LOW</h3>
+    <p>A qualifying low hand must have <strong>5 different ranks</strong> — no pairs. Aces play low (value 1). Best possible low is A-2-3-4-5. Lower is better.</p>
+    <table class="scoring-table">
+      <tr><th>HAND</th><th>RANK</th><th>NOTES</th></tr>
+      <tr><td class="hand-rank">A-2-3-4-5</td><td>Best possible</td><td>The wheel</td></tr>
+      <tr><td class="hand-rank">A-2-3-4-6</td><td>2nd best</td><td></td></tr>
+      <tr><td class="hand-rank">A-2-3-5-6</td><td>3rd best</td><td></td></tr>
+      <tr><td class="hand-rank">9-8-7-6-5</td><td>Decent low</td><td>All different ranks</td></tr>
+      <tr><td class="hand-rank">K-Q-J-10-9</td><td>Worst qualifying</td><td>Still beats no low</td></tr>
+      <tr><td class="hand-rank">A-A-2-3-4</td><td>DOES NOT QUALIFY</td><td>Pair = no low</td></tr>
+    </table>
+    <div class="example">💡 The Factor Card (Col 3 single) breaks ties — the player whose low hand uses the Factor Card's suit wins.</div>
+  </div>
+  <div class="playthrough-header">HIGH HAND RANKINGS</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3>STANDARD POKER HANDS — BEST TO WORST</h3>
+    <table class="scoring-table">
+      <tr><th>RANK</th><th>HAND</th><th>EXAMPLE</th></tr>
+      <tr><td>1st</td><td class="hand-rank">Straight Flush</td><td>5♠ 6♠ 7♠ 8♠ 9♠</td></tr>
+      <tr><td>2nd</td><td class="hand-rank">Four of a Kind</td><td>K♠ K♥ K♦ K♣ 2♠</td></tr>
+      <tr><td>3rd</td><td class="hand-rank">Full House</td><td>Q♠ Q♥ Q♦ 7♠ 7♥</td></tr>
+      <tr><td>4th</td><td class="hand-rank">Flush</td><td>A♠ J♠ 8♠ 5♠ 2♠</td></tr>
+      <tr><td>5th</td><td class="hand-rank">Straight</td><td>7♠ 8♥ 9♦ 10♣ J♠</td></tr>
+      <tr><td>6th</td><td class="hand-rank">Three of a Kind</td><td>J♠ J♥ J♦ 4♠ 2♣</td></tr>
+      <tr><td>7th</td><td class="hand-rank">Two Pair</td><td>A♠ A♥ K♠ K♥ Q♠</td></tr>
+      <tr><td>8th</td><td class="hand-rank">One Pair</td><td>10♠ 10♥ A♠ K♠ 2♣</td></tr>
+      <tr><td>9th</td><td class="hand-rank">High Card</td><td>A♠ K♥ J♦ 7♣ 2♠</td></tr>
+    </table>
+  </div>
+  <div class="playthrough-header">STRATEGY TIPS</div>
+  <div class="tips-grid">
+    <div class="tip-card">
+      <div class="tip-icon">👀</div>
+      <h4>WATCH THE BOARD</h4>
+      <p>Pairs are visible from the start. High pairs = high hand potential. Low singles = low hand potential. Plan before the draw.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🎯</div>
+      <h4>COMMIT EARLY</h4>
+      <p>Decide high or low before declare if possible. Swing hands are rare — don't be greedy unless you have a monster on both sides.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🔒</div>
+      <h4>HIDDEN DECLARES</h4>
+      <p>You can't see others' declarations until all are in. Use your betting to disguise which direction you're heading.</p>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">⭐</div>
+      <h4>FACTOR CARD</h4>
+      <p>In a low tie, whoever uses the Factor Card's suit wins. If going low, track whether your cards include that suit.</p>
+    </div>
+  </div>
+</section>
+<section class="game-section" id="section-badugi">
+  <div class="overview badugi-overview">
+    <h2>BADUGI</h2>
+    <p>A four-card draw game where the goal is to build a "badugi" — four cards of completely different suits AND different ranks. No community board, no swing — just you, your four cards, and three chances to draw. Declare HIGH or LOW. Only players with a valid four-card badugi can win their pot.</p>
+    <div class="quick-facts">
+      <div class="fact"><div class="fact-val">4</div><div class="fact-label">HOLE CARDS</div></div>
+      <div class="fact"><div class="fact-val">3</div><div class="fact-label">DRAW ROUNDS</div></div>
+      <div class="fact"><div class="fact-val">3</div><div class="fact-label">BET ROUNDS</div></div>
+      <div class="fact"><div class="fact-val">2</div><div class="fact-label">POTS</div></div>
+    </div>
+  </div>
+
+  <div class="playthrough-header badugi-color">HOW A HAND PLAYS OUT</div>
+
+  <div class="step">
+    <div class="step-num teal">1</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3 class="teal">ANTE UP <span class="phase-pill teal">ANTE</span></h3>
+      <p>Everyone posts the ante ($10). If the previous hand had no winner the pot rolls over — no ante needed for rollover hands, the existing pot carries forward.</p>
+      <div class="rollover-box">
+        <h4>💰 POT ROLLOVER</h4>
+        <p>If nobody has a valid badugi at showdown, the entire pot carries to the next hand. The new hand skips ante and goes straight to drawing. Pots can build up significantly over multiple rollovers!</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num teal">2</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3 class="teal">4 CARDS DEALT</h3>
+      <p>Each player receives 4 private hole cards. No community board — it's all about your own hand.</p>
+      <div class="card-demo">
+        <div class="demo-card red"><div class="cv">A</div><div class="cs">♥</div></div>
+        <div class="demo-card"><div class="cv">7</div><div class="cs">♠</div></div>
+        <div class="demo-card red"><div class="cv">3</div><div class="cs">♦</div></div>
+        <div class="demo-card"><div class="cv">J</div><div class="cs">♣</div></div>
+      </div>
+      <div class="example teal-border">✅ Already a valid badugi! A♥ 7♠ 3♦ J♣ — all four different suits, all four different ranks.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num teal">3</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3 class="teal">DRAW ROUND 1 — UP TO 3 CARDS <span class="phase-pill teal">DRAW 1</span></h3>
+      <p>Swap <strong>up to 3 cards</strong>. Tap the cards you want replaced. If you already have a good badugi keep all 4. After everyone draws a betting round happens.</p>
+      <div class="card-demo">
+        <div class="demo-card red"><div class="cv">K</div><div class="cs">♥</div></div>
+        <div class="demo-card selected teal"><div class="cv">K</div><div class="cs">♠</div></div>
+        <div class="demo-card red selected teal"><div class="cv">5</div><div class="cs">♦</div></div>
+        <div class="demo-card selected teal"><div class="cv">2</div><div class="cs">♣</div></div>
+      </div>
+      <div class="example teal-border">K♥ K♠ 5♦ 2♣ — two kings (same rank!) means no badugi. Swap the duplicate K and high cards to chase a low badugi.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num teal">4</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3 class="teal">BET, THEN DRAW ROUND 2 — UP TO 2 CARDS <span class="phase-pill teal">DRAW 2</span></h3>
+      <p>After the first betting round, swap <strong>up to 2 cards</strong>. Your window is getting smaller — make the most important swaps now.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num teal">5</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3 class="teal">BET, THEN DRAW ROUND 3 — UP TO 1 CARD <span class="phase-pill teal">DRAW 3</span></h3>
+      <p>Final draw — swap <strong>only 1 card</strong>. Last chance to complete your badugi. After this draw there's one more bet then declare.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num teal">6</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3 class="teal">DECLARE HIGH OR LOW <span class="phase-pill teal">DECLARE</span></h3>
+      <p>Players declare in turn order, hidden from each other until all have declared. Choose <strong>HIGH</strong> or <strong>LOW</strong>. There is no swing in Badugi.</p>
+      <div class="declare-options">
+        <div class="decl-btn decl-high">HIGH ⬆️<br><span style="font-size:0.65rem;opacity:0.7">Highest badugi wins half pot</span></div>
+        <div class="decl-btn decl-low">LOW ⬇️<br><span style="font-size:0.65rem;opacity:0.7">Lowest badugi wins half pot</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num teal">7</div>
+    <div class="step-connector"></div>
+    <div class="step-body">
+      <h3 class="teal">FINAL BETTING <span class="phase-pill teal">FINAL BET</span></h3>
+      <p>One more betting round after declarations are revealed. Pump the pot if you have a strong badugi, or fold if you're sitting on an invalid hand.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num teal">8</div>
+    <div class="step-body">
+      <h3 class="teal">SHOWDOWN <span class="phase-pill teal">SHOWDOWN</span></h3>
+      <p>Only players with a <strong>valid 4-card badugi</strong> can win. Invalid hands lose automatically. Pot splits between best HIGH and best LOW badugi.</p>
+      <div class="example teal-border">
+        🏆 HIGH: Highest badugi among HIGH declarers — K-Q-J-10 is best<br>
+        🏆 LOW: Lowest badugi among LOW declarers — A-2-3-4 is best<br>
+        ❌ No valid badugis = entire pot rolls over to next hand!
+      </div>
+    </div>
+  </div>
+  <div class="playthrough-header badugi-color">WHAT MAKES A VALID BADUGI?</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3 class="teal">THE TWO RULES</h3>
+    <p>Both conditions must be true at the same time:</p>
+    <div class="example teal-border" style="margin-top:12px">
+      <strong>1. All 4 different suits</strong> — one ♠, one ♥, one ♦, one ♣<br>
+      <strong>2. All 4 different ranks</strong> — no two cards with the same value
+    </div>
+    <p style="margin-top:16px;color:#22ccaa;font-weight:600">✅ VALID BADUGIS:</p>
+    <div class="card-demo">
+      <div class="demo-card winner"><div class="cv">A</div><div class="cs">♠</div></div>
+      <div class="demo-card winner red"><div class="cv">2</div><div class="cs">♥</div></div>
+      <div class="demo-card winner red"><div class="cv">3</div><div class="cs">♦</div></div>
+      <div class="demo-card winner"><div class="cv">4</div><div class="cs">♣</div></div>
+    </div>
+    <div class="card-label" style="text-align:left;margin-top:4px">A♠ 2♥ 3♦ 4♣ — Best possible low badugi</div>
+    <div class="card-demo" style="margin-top:12px">
+      <div class="demo-card winner"><div class="cv">K</div><div class="cs">♠</div></div>
+      <div class="demo-card winner red"><div class="cv">Q</div><div class="cs">♥</div></div>
+      <div class="demo-card winner red"><div class="cv">J</div><div class="cs">♦</div></div>
+      <div class="demo-card winner"><div class="cv">10</div><div class="cs">♣</div></div>
+    </div>
+    <div class="card-label" style="text-align:left;margin-top:4px">K♠ Q♥ J♦ 10♣ — Best possible high badugi</div>
+    <p style="margin-top:16px;color:#ff6644;font-weight:600">❌ INVALID HANDS:</p>
+    <div class="card-demo">
+      <div class="demo-card"><div class="cv">A</div><div class="cs">♠</div></div>
+      <div class="demo-card red"><div class="cv">A</div><div class="cs">♥</div></div>
+      <div class="demo-card red"><div class="cv">3</div><div class="cs">♦</div></div>
+      <div class="demo-card"><div class="cv">4</div><div class="cs">♣</div></div>
+    </div>
+    <div class="card-label" style="text-align:left;margin-top:4px">Two aces = same rank → NOT a badugi</div>
+    <div class="card-demo" style="margin-top:12px">
+      <div class="demo-card"><div class="cv">2</div><div class="cs">♠</div></div>
+      <div class="demo-card"><div class="cv">5</div><div class="cs">♠</div></div>
+      <div class="demo-card red"><div class="cv">3</div><div class="cs">♦</div></div>
+      <div class="demo-card"><div class="cv">4</div><div class="cs">♣</div></div>
+    </div>
+    <div class="card-label" style="text-align:left;margin-top:4px">Two spades = same suit → NOT a badugi</div>
+  </div>
+
+  <div class="playthrough-header badugi-color">RANKING BADUGIS</div>
+  <div class="step-body" style="margin-bottom:24px">
+    <h3 class="teal">HIGH BADUGI — Higher ranks win</h3>
+    <p>Compare highest card first. K-Q-J-10 beats K-Q-J-9. Higher single card wins ties.</p>
+    <div class="example teal-border" style="margin-top:10px">K♠ Q♥ J♦ 10♣ beats K♠ Q♥ J♦ 9♣ (10 beats 9 at 4th card)</div>
+    <h3 class="teal" style="margin-top:20px">LOW BADUGI — Lower ranks win</h3>
+    <p>Compare highest card first — lower is better. A-2-3-4 is the nuts. Ace plays as 1.</p>
+    <div class="example teal-border" style="margin-top:10px">A♠ 2♥ 3♦ 4♣ beats A♠ 2♥ 3♦ 5♣ (4 beats 5 at 4th card)</div>
+  </div>
+
+  <div class="playthrough-header badugi-color">STRATEGY TIPS</div>
+  <div class="tips-grid">
+    <div class="tip-card teal">
+      <div class="tip-icon">🎯</div>
+      <h4>SUIT PRIORITY</h4>
+      <p>On draw 1 fix duplicate suits before duplicate ranks. A suit conflict is harder to resolve — you need exactly one of each.</p>
+    </div>
+    <div class="tip-card teal">
+      <div class="tip-icon">📉</div>
+      <h4>GO LOW</h4>
+      <p>Low badugis are more valuable because they're harder to make. If you hold A-2-3 of different suits protect those and chase the 4th.</p>
+    </div>
+    <div class="tip-card teal">
+      <div class="tip-icon">🃏</div>
+      <h4>DRAW TIMING</h4>
+      <p>Use draw 1 for major repairs (up to 3). Use draw 2 for fine-tuning (1-2). By draw 3 you should only need 1 card at most.</p>
+    </div>
+    <div class="tip-card teal">
+      <div class="tip-icon">💰</div>
+      <h4>ROLLOVER POTS</h4>
+      <p>Big rollover pots change the game. Play tighter and wait for a strong badugi before committing chips into a massive pot.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="page-footer">
+  <div>CHAIN GANG POKER — THE ORIGINAL YARD GAME</div>
+  <a href="/" class="play-btn">PLAY NOW</a>
+</footer>
+
+<script>
+function showGame(game, el) {
+  document.querySelectorAll('.game-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('section-' + game).classList.add('active');
+  el.classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
