@@ -903,6 +903,7 @@ function advance1535Turn(room) {
     loops++;
   }
   const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed && !is1535Bust(calc1535Score(p.hand).score));
+  console.log('[1535] stillNeedHit:',stillNeedHit.length,'active:',active.length,'phase:',room.phase);
   if (stillNeedHit.length === 0) {
     const notBust = active.filter(p => !is1535Bust(calc1535Score(p.hand).score));
     if (notBust.length === 0) {
