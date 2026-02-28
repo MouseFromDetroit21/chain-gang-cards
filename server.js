@@ -869,8 +869,8 @@ function player1535Hit(roomId, userId) {
   p.hand.push(newCard);
   const { score, display } = calc1535Score(p.hand);
   if (is1535Bust(score)) {
-    addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} — BUST! (${display} pts)`, 'imp');
-    p.stayed = true;
+    addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} — BUST! AUTO-FOLDED (${display} pts)`, 'imp');
+    p.folded = true;
   } else {
     const vis = calc1535VisibleScore(p.hand);
     addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} (showing: ${vis.display} pts)`);
@@ -902,10 +902,9 @@ function advance1535Turn(room) {
     next = (next + 1) % room.players.length;
     loops++;
   }
-  const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed && !is1535Bust(calc1535Score(p.hand).score));
+  const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed);
   if (stillNeedHit.length === 0) {
-    const notBust = active.filter(p => !is1535Bust(calc1535Score(p.hand).score));
-    if (notBust.length === 0) {
+    if (active.filter(p=>!p.folded).length === 0) {
       addLog(room, 'Everyone busted! Dealing fresh cards — no ante needed.', 'imp');
       broadcastRoom(room.id);
       setTimeout(() => {
@@ -953,10 +952,19 @@ function end1535BettingRound(room) {
     setTimeout(() => { if(rooms[room.id]) start1535Game(room.id); }, 5000);
     return;
   }
-  // Check if only one non-bust player remains — they win
-  const notBust = active.filter(p => !is1535Bust(calc1535Score(p.hand).score));
-  if (notBust.length <= 1) { do1535Showdown(room); return; }
-  const stillPlaying = active.filter(p => !p.stayed && !is1535Bust(calc1535Score(p.hand).score));
+  // Busts auto-fold so active = non-busted players
+  if (active.length === 1) {
+    const winner = active[0];
+    const rp = room.players.find(p => p.userId === winner.userId);
+    if (rp) rp.chips += room.pot;
+    db.updateUser(winner.userId, {chips:(db.findUser(u=>u.id===winner.userId)||{chips:0}).chips+room.pot,wins:(db.findUser(u=>u.id===winner.userId)||{wins:0}).wins+1});
+    addLog(room, `LAST STANDING (${room.pot}): ${winner.displayName} wins!`, 'win');
+    room.pot = 0; room.phase = 'showdown';
+    broadcastRoom(room.id);
+    setTimeout(() => { if(rooms[room.id]){ room.players.forEach(p=>{p.folded=false;p.stayed=false;p.ready=false;p.acted=false;}); start1535Game(room.id); } }, 8000);
+    return;
+  }
+  const stillPlaying = active.filter(p => !p.stayed);
   if (stillPlaying.length === 0) {
     do1535Showdown(room);
   } else {
