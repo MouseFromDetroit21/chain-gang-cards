@@ -188,11 +188,12 @@ const userSocket={};
 
 function createRoom(isPrivate=false,gameType='chaingang') {
   const id=isPrivate?Math.random().toString(36).substr(2,6).toUpperCase():uuidv4();
-  rooms[id]={id,isPrivate,gameType,players:[],phase:'waiting',pot:0,currentBet:0,ante:10,cols:[],deck:[],deckIdx:0,log:[],currentTurn:0,drawRound:0};
+  rooms[id]={id,isPrivate,gameType,players:[],phase:'waiting',pot:0,currentBet:0,ante:10,cols:[],deck:[],deckIdx:0,log:[],currentTurn:0,drawRound:0,dealerIdx:0};
   return rooms[id];
 }
 function publicRoom(gameType) {
-  return Object.values(rooms).find(r=>!r.isPrivate&&r.phase==='waiting'&&r.players.length<5&&r.gameType===gameType)||createRoom(false,gameType);
+  const max=gameType==='1333'?5:5;
+  return Object.values(rooms).find(r=>!r.isPrivate&&r.phase==='waiting'&&r.players.length<max&&r.gameType===gameType)||createRoom(false,gameType);
 }
 function addLog(room,msg,type='act') {
   room.log.unshift({msg,type,ts:Date.now()});
@@ -774,6 +775,7 @@ io.on('connection',socket=>{
     addLog(room,`${u.displayName} joined the table.`,'imp');
     broadcastRoom(room.id);
     if(!room.isPrivate)scheduleBot(room.id);
+    if(room.players.length>=5)return socket.emit('error','Table is full!');
     if(room.players.length>=2&&room.phase==='waiting'){
       setTimeout(()=>{if(rooms[room.id]&&room.players.length>=2&&room.phase==='waiting')startGame(room.id);},3000);
     }
@@ -817,6 +819,8 @@ function start1535Game(roomId) {
   room.currentBet = 0;
   room.log = [];
   room.hitRound = 0;
+  room.dealerIdx=(room.dealerIdx+1)%room.players.length;
+  const leftOfDealer=(room.dealerIdx+1)%room.players.length;
   room.players.forEach(p => {
     p.hand = [deck[idx++], deck[idx++]];
     p.bet = 0; p.folded = false; p.stayed = false;
@@ -846,9 +850,9 @@ function checkAllAnted1535(roomId) {
     active.forEach(p => { p.ready = false; });
     room.phase = 'hit';
     room.hitRound = 1;
-    const first = room.players.findIndex(p => !p.folded);
-    room.currentTurn = first >= 0 ? first : 0;
-    addLog(room, 'Up cards showing! Hit or Stay?', 'imp');
+    const lod=(room.dealerIdx+1)%room.players.length;
+    room.currentTurn=lod;
+    addLog(room, 'Up cards showing! Starting left of dealer — Hit or Stay?', 'imp');
     broadcastRoom(roomId);
   }
 }

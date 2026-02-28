@@ -680,19 +680,20 @@ function render1333(state) {
 
   // My cards
   let myCardsHtml = '';
-  if (state.myHand && state.myHand.length) {
-    const holeCard = state.myHand[0];
-    const upCards = state.myHand.slice(1);
-    myCardsHtml = '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span></div><div class="hole-cards-row">' +
-      '<div>' + cardHtml(holeCard, false, null) + '<div class="card-label" style="color:#888">HOLE ????</div></div>' +
-      upCards.map(card => '<div>' + cardHtml(card, false, null) + '<div class="card-label">UP</div></div>').join('') +
-      '</div></div>';
-  } else if (phase === 'ante') {
+  if (phase === 'ante') {
+    // Hide all cards until ante posted
     myCardsHtml = '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span></div>' +
       '<div class="hole-cards-row">' +
       '<div><div class="card card-back"></div><div class="card-label">HOLE</div></div>' +
       '<div><div class="card card-back"></div><div class="card-label">UP</div></div>' +
       '</div><div style="font-size:0.7rem;color:#888;text-align:center;margin-top:6px">Post ante to reveal your up card</div></div>';
+  } else if (state.myHand && state.myHand.length) {
+    const holeCard = state.myHand[0];
+    const upCards = state.myHand.slice(1);
+    myCardsHtml = '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span></div><div class="hole-cards-row">' +
+      '<div>' + cardHtml(holeCard, false, null) + '<div class="card-label" style="color:#888">HOLE</div></div>' +
+      upCards.map(card => '<div>' + cardHtml(card, false, null) + '<div class="card-label">UP</div></div>').join('') +
+      '</div></div>';
   }
 
   // Other players — show visible cards and visible score only
