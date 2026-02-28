@@ -1035,11 +1035,13 @@ function bot1535Action(roomId) {
   if (!room) return;
   const p = room.players[room.currentTurn];
   if (!p || !p.isBot) return;
+  console.log('[BOT1535] firing for',p.displayName,'stayed:',p.stayed,'folded:',p.folded);
   setTimeout(() => {
     const r = rooms[roomId];
     if (!r || r.phase !== 'hit') return;
     const bot = r.players[r.currentTurn];
     if (!bot || !bot.isBot) return;
+    console.log('[BOT1535] acting:',bot.displayName,'stayed:',bot.stayed,'folded:',bot.folded);
     const { score } = calc1535Score(bot.hand);
     if (is1535Low(score) || is1535High(score)) {
       player1535Stay(roomId, bot.userId);
