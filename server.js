@@ -246,7 +246,7 @@ function sanitizeForPlayer(room,userId) {
     currentTurn:room.currentTurn,winner:room.winner||null
   };
 }
-function broadcastRoom(roomId) {
+function _broadcastRoom(roomId) {
   const room=rooms[roomId];
   if(!room)return;
   room.players.forEach(p=>{
@@ -908,7 +908,6 @@ function botDeclare(roomId) {
 }
 
 // Hook bot actions into broadcast
-const _broadcastRoom=broadcastRoom;
 function broadcastRoom(roomId) {
   _broadcastRoom(roomId);
   const room=rooms[roomId];
