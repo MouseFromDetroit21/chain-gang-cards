@@ -822,10 +822,12 @@ function start1535Game(roomId) {
   room.dealerIdx=(room.dealerIdx+1)%room.players.length;
   const leftOfDealer=(room.dealerIdx+1)%room.players.length;
   room.players.forEach(p => {
-    p.hand = [deck[idx++], deck[idx++]];
-    p.bet = 0; p.folded = false; p.stayed = false;
-    p.decl = null; p.ready = false; p.acted = false;
-    p.drawDone = false; p.selectedDraw = [];
+    if (!p.folded) {
+      p.hand = [deck[idx++], deck[idx++]];
+      p.bet = 0; p.stayed = false;
+      p.decl = null; p.ready = false; p.acted = false;
+      p.drawDone = false; p.selectedDraw = [];
+    }
   });
   room.deckIdx = idx;
   if (room.pot > 0) {
@@ -900,7 +902,7 @@ function advance1535Turn(room) {
     next = (next + 1) % room.players.length;
     loops++;
   }
-  const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed);
+  const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed && !is1535Bust(calc1535Score(p.hand).score));
   if (stillNeedHit.length === 0) {
     const notBust = active.filter(p => !is1535Bust(calc1535Score(p.hand).score));
     if (notBust.length === 0) {
@@ -913,7 +915,7 @@ function advance1535Turn(room) {
         room.players.forEach(p => {
           if (!p.folded) {
             p.hand = [deck2[idx2++], deck2[idx2++]];
-            p.stayed = false; p.acted = false; p.drawDone = false;
+            p.stayed = false; p.ready = false; p.acted = false; p.drawDone = false;
           }
         });
         room.deck = deck2; room.deckIdx = idx2;
@@ -945,16 +947,32 @@ function start1535Betting(room) {
 
 function end1535BettingRound(room) {
   const active = room.players.filter(p => !p.folded);
-  if (active.length <= 1) { earlyWin(room); return; }
-  const stillPlaying = active.filter(p => !p.stayed);
+  if (active.length <= 1) {
+    addLog(room, 'All others folded — pot rolls to next hand!', 'imp');
+    broadcastRoom(room.id);
+    setTimeout(() => { if(rooms[room.id]) start1535Game(room.id); }, 5000);
+    return;
+  }
+  // Check if only one non-bust player remains — they win
+  const notBust = active.filter(p => !is1535Bust(calc1535Score(p.hand).score));
+  if (notBust.length <= 1) { do1535Showdown(room); return; }
+  const stillPlaying = active.filter(p => !p.stayed && !is1535Bust(calc1535Score(p.hand).score));
   if (stillPlaying.length === 0) {
     do1535Showdown(room);
   } else {
     room.hitRound++;
     room.phase = 'hit';
-    room.players.forEach(p => { p.acted = false; });
-    const first = room.players.findIndex(p => !p.folded && !p.stayed);
-    room.currentTurn = first >= 0 ? first : room.players.findIndex(p => !p.folded);
+    room.players.forEach(p => { p.acted = false; p.drawDone = false; });
+    const lod = (room.dealerIdx+1) % room.players.length;
+    let first = lod;
+    let loops = 0;
+    while (loops < room.players.length) {
+      const p = room.players[first];
+      if (!p.folded && !p.stayed && !is1535Bust(calc1535Score(p.hand).score)) break;
+      first = (first+1) % room.players.length;
+      loops++;
+    }
+    room.currentTurn = first;
     addLog(room, `Hit round ${room.hitRound} — Hit or Stay?`, 'imp');
     broadcastRoom(room.id);
   }
@@ -1003,7 +1021,10 @@ function do1535Showdown(room) {
   broadcastRoom(room.id);
   setTimeout(() => {
     if (!rooms[room.id]) return;
-    room.players.forEach(p => { p.folded=false; p.stayed=false; p.ready=false; p.acted=false; p.drawDone=false; });
+    // Folded players stay folded — only busted players get fresh cards
+    room.players.forEach(p => {
+      if (!p.folded) { p.stayed=false; p.ready=false; p.acted=false; p.drawDone=false; }
+    });
     start1535Game(room.id);
   }, 10000);
 }
