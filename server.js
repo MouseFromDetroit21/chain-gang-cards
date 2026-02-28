@@ -480,6 +480,7 @@ function startBadugiGame(roomId) {
   room.deckIdx=idx;room.log=[];
   if(carryPot>0){
     room.phase='draw';
+    room.drawRound=1;
     addLog(room,'POT ROLLS OVER! New hand — draw round 1 of 3.','imp');
   } else {
     room.phase='ante';
@@ -488,6 +489,7 @@ function startBadugiGame(roomId) {
   broadcastRoom(roomId);
 }
 function startBadugiDraw(room) {
+  room.drawRound=(room.drawRound||0)+1;
   room.phase='draw';
   room.players.forEach(p=>{if(!p.folded){p.drawDone=false;p.selectedDraw=[];}});
   addLog(room,`Draw round ${room.drawRound} of 3 — swap any cards!`,'imp');
