@@ -1188,7 +1188,7 @@ function broadcastRoom(roomId) {
   if(!room)return;
   if(room.phase==='ante') botAnte(roomId);
   else if(room.phase==='draw') botDraw(roomId);
-  else if(['bet1','bet2','bet3','bbet','fbet'].includes(room.phase)){
+  else if(['bet1','bet2','bet3','bbet','fbet','bet'].includes(room.phase)){
     const cur=room.players[room.currentTurn];
     if(cur&&cur.isBot) botBet(roomId);
   }
