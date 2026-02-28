@@ -698,6 +698,23 @@ io.on('connection',socket=>{
     if(!room)return;
     io.to(socket.roomId).emit('chat',{from:u.displayName,avatar:u.avatar,msg:msg.slice(0,100)});
   });
+  socket.on('rebuy',({amount})=>{
+    const u=socketUser[socket.id];
+    if(!u)return;
+    const validAmt=[500,1000].includes(amount)?amount:500;
+    const dbUser=db.findUser(u2=>u2.id===u.userId);
+    if(!dbUser)return;
+    dbUser.chips+=validAmt;
+    db.updateUser(u.userId,{chips:dbUser.chips});
+    const room=rooms[socket.roomId];
+    if(room){
+      const p=room.players.find(p=>p.userId===u.userId);
+      if(p)p.chips+=validAmt;
+      addLog(room,`${u.displayName} rebuys ${validAmt} in chips!`,'imp');
+      broadcastRoom(socket.roomId);
+    }
+    socket.emit('authOk',safeUser(dbUser));
+  });
   socket.on('leaveRoom',()=>leaveCurrentRoom(socket));
   socket.on('disconnect',()=>{
     const u=socketUser[socket.id];
