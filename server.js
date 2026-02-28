@@ -763,6 +763,7 @@ function scheduleBot(roomId) {
       r.players.push(bot);
       addLog(r,`${bot.displayName} joined the table.`,'imp');
       broadcastRoom(roomId);
+      if(r.phase==='ante') botAnte(roomId);
       if(r.players.length>=2&&r.phase==='waiting'){
         setTimeout(()=>{if(rooms[roomId]&&r.phase==='waiting')startGame(roomId);},3000);
       }
