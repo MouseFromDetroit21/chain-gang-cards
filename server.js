@@ -903,7 +903,6 @@ function advance1535Turn(room) {
     loops++;
   }
   const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed && !is1535Bust(calc1535Score(p.hand).score));
-  console.log('[1535] stillNeedHit:',stillNeedHit.length,'active:',active.length,'phase:',room.phase);
   if (stillNeedHit.length === 0) {
     const notBust = active.filter(p => !is1535Bust(calc1535Score(p.hand).score));
     if (notBust.length === 0) {
@@ -1035,25 +1034,27 @@ function bot1535Action(roomId) {
   if (!room) return;
   const p = room.players[room.currentTurn];
   if (!p || !p.isBot) return;
-  console.log('[BOT1535] firing for',p.displayName,'stayed:',p.stayed,'folded:',p.folded);
+  const botIdx = room.currentTurn;
+  const botUserId = p.userId;
   setTimeout(() => {
     const r = rooms[roomId];
     if (!r || r.phase !== 'hit') return;
-    const bot = r.players[r.currentTurn];
-    if (!bot || !bot.isBot) return;
-    console.log('[BOT1535] acting:',bot.displayName,'stayed:',bot.stayed,'folded:',bot.folded);
+    // Verify it's still this bot's turn
+    if (r.currentTurn !== botIdx) return;
+    const bot = r.players[botIdx];
+    if (!bot || !bot.isBot || bot.stayed || bot.folded) return;
     const { score } = calc1535Score(bot.hand);
     if (is1535Low(score) || is1535High(score)) {
-      player1535Stay(roomId, bot.userId);
+      player1535Stay(roomId, botUserId);
     } else if (score < 13) {
-      player1535Hit(roomId, bot.userId);
+      player1535Hit(roomId, botUserId);
     } else if (score > 15 && score < 28) {
-      player1535Hit(roomId, bot.userId);
+      player1535Hit(roomId, botUserId);
     } else if (score >= 28 && score <= 32) {
-      if (Math.random() < 0.7) player1535Hit(roomId, bot.userId);
-      else player1535Stay(roomId, bot.userId);
+      if (Math.random() < 0.7) player1535Hit(roomId, botUserId);
+      else player1535Stay(roomId, botUserId);
     } else {
-      player1535Stay(roomId, bot.userId);
+      player1535Stay(roomId, botUserId);
     }
   }, 1200 + Math.random() * 1500);
 }
