@@ -892,8 +892,21 @@ function player1535Stay(roomId, userId) {
 }
 
 function advance1535Turn(room) {
+  // Recalculate active each time as busts may have folded
   const active = room.players.filter(p => !p.folded);
-  if (active.length <= 1) { earlyWin(room); return; }
+  if (active.length <= 1) {
+    if (active.length === 1) {
+      const winner = active[0];
+      const rp = room.players.find(p=>p.userId===winner.userId);
+      if(rp) rp.chips+=room.pot;
+      db.updateUser(winner.userId,{chips:(db.findUser(u=>u.id===winner.userId)||{chips:0}).chips+room.pot,wins:(db.findUser(u=>u.id===winner.userId)||{wins:0}).wins+1});
+      addLog(room,`LAST STANDING (${room.pot}): ${winner.displayName} wins!`,'win');
+      room.pot=0; room.phase='showdown';
+      broadcastRoom(room.id);
+      setTimeout(()=>{ if(rooms[room.id]){ room.players.forEach(p=>{p.folded=false;p.stayed=false;p.ready=false;p.acted=false;}); start1535Game(room.id); } },8000);
+    }
+    return;
+  }
   let next = (room.currentTurn + 1) % room.players.length;
   let loops = 0;
   while (loops < room.players.length) {
@@ -903,6 +916,10 @@ function advance1535Turn(room) {
     loops++;
   }
   const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed);
+  // If only 1 active after others busted/folded, they win
+  if (active.filter(p=>!p.folded).length === 1 && stillNeedHit.length <= 1) {
+    advance1535Turn(room); return;
+  }
   if (stillNeedHit.length === 0) {
     if (active.filter(p=>!p.folded).length === 0) {
       addLog(room, 'Everyone busted! Dealing fresh cards — no ante needed.', 'imp');
