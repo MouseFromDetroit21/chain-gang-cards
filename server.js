@@ -269,7 +269,9 @@ function playerBetAction(roomId,userId,action,amount) {
     addLog(room,`${p.displayName} calls $${amt}.`);
   }
   else if(action==='raise'){
-    const amt=Math.min(amount,p.chips);
+    const isFinal=room.phase==='bet3'||room.phase==='fbet';
+    const maxRaise=isFinal?25:15;
+    const amt=Math.min(amount,p.chips,maxRaise);
     if(amt<=room.currentBet)return;
     p.chips-=amt;room.pot+=amt;room.currentBet=amt;p.bet=amt;
     room.players.forEach((op,i)=>{if(i!==pIdx&&!op.folded)op.acted=false;});
@@ -722,9 +724,204 @@ io.on('connection',socket=>{
     broadcastRoom(room.id);
     if(room.players.length>=2&&room.phase==='waiting'){
       setTimeout(()=>{if(rooms[room.id]&&room.players.length>=2&&room.phase==='waiting')startGame(room.id);},3000);
+      if(!room.isPrivate)scheduleBot(room.id);
     }
   }
 });
 
+// ── BOT SYSTEM ──────────────────────────────────────────
+const BOT_NAMES=[
+  {displayName:'DaQuan',avatar:'😎'},{displayName:'Lil\' Ricky',avatar:'🤠'},
+  {displayName:'Smoke',avatar:'💀'},{displayName:'Tanya',avatar:'🦊'},
+  {displayName:'Big Mike',avatar:'🐻'},{displayName:'Keisha',avatar:'👑'},
+  {displayName:'Dre',avatar:'🔥'},{displayName:'Peanut',avatar:'🃏'},
+  {displayName:'Bootleg',avatar:'🎰'},{displayName:'Precious',avatar:'🧠'}
+];
+
+function makeBotPlayer(gameType) {
+  const n=BOT_NAMES[Math.floor(Math.random()*BOT_NAMES.length)];
+  return {
+    userId:'bot_'+uuidv4(),username:'bot',displayName:n.displayName,
+    avatar:n.avatar,chips:1000,hand:[],bet:0,folded:false,
+    decl:null,ready:false,selectedDraw:[],drawDone:false,acted:false,isBot:true
+  };
+}
+
+function scheduleBot(roomId) {
+  const room=rooms[roomId];
+  if(!room||room.isPrivate)return;
+  // First bot after 12 seconds
+  setTimeout(()=>{
+    const r=rooms[roomId];
+    if(!r||r.phase!=='waiting'||r.isPrivate)return;
+    const humans=r.players.filter(p=>!p.isBot);
+    if(humans.length>=1&&r.players.length<3){
+      const bot=makeBotPlayer(r.gameType);
+      r.players.push(bot);
+      addLog(r,`${bot.displayName} joined the table.`,'imp');
+      broadcastRoom(roomId);
+      if(r.players.length>=2&&r.phase==='waiting'){
+        setTimeout(()=>{if(rooms[roomId]&&r.phase==='waiting')startGame(roomId);},3000);
+      }
+      // Second bot after another 8 seconds if still waiting
+      setTimeout(()=>{
+        const r2=rooms[roomId];
+        if(!r2||r2.phase!=='waiting'||r2.isPrivate)return;
+        const humans2=r2.players.filter(p=>!p.isBot);
+        if(humans2.length>=1&&r2.players.length<3){
+          const bot2=makeBotPlayer(r2.gameType);
+          r2.players.push(bot2);
+          addLog(r2,`${bot2.displayName} joined the table.`,'imp');
+          broadcastRoom(roomId);
+        }
+      },8000);
+    }
+  },12000);
+}
+
+function botAnte(roomId) {
+  const room=rooms[roomId];
+  if(!room||room.phase!=='ante')return;
+  room.players.filter(p=>p.isBot&&!p.ready).forEach(p=>{
+    setTimeout(()=>{
+      const r=rooms[roomId];
+      if(!r||r.phase!=='ante'||p.ready)return;
+      p.chips-=r.ante;r.pot+=r.ante;p.ready=true;
+      addLog(r,`${p.displayName} posted ante.`);
+      broadcastRoom(roomId);
+      if(r.gameType==='badugi')checkAllAntedBadugi(roomId);
+      else checkAllAnted(roomId);
+    },1000+Math.random()*2000);
+  });
+}
+
+function botDraw(roomId) {
+  const room=rooms[roomId];
+  if(!room||room.phase!=='draw')return;
+  room.players.filter(p=>p.isBot&&!p.drawDone).forEach(p=>{
+    setTimeout(()=>{
+      const r=rooms[roomId];
+      if(!r||r.phase!=='draw'||p.drawDone)return;
+      if(r.gameType==='badugi'){
+        // Smart badugi draw — discard duplicates suits/ranks
+        const hand=p.hand;
+        const toDiscard=[];
+        const seenSuits={},seenRanks={};
+        hand.forEach((c,i)=>{
+          if(seenSuits[c.s]!==undefined||seenRanks[c.v]!==undefined) toDiscard.push(i);
+          else{seenSuits[c.s]=i;seenRanks[c.v]=i;}
+        });
+        const maxDraw=[3,2,1][r.drawRound-1]??1;
+        const selected=toDiscard.slice(0,maxDraw);
+        confirmBadugiDraw(r,p.userId,selected);
+      } else {
+        // Chain Gang draw — discard worst 1-2 cards
+        const selected=[];
+        if(Math.random()<0.7) selected.push(Math.floor(Math.random()*5));
+        if(Math.random()<0.4){
+          let s2=Math.floor(Math.random()*5);
+          while(s2===selected[0])s2=Math.floor(Math.random()*5);
+          selected.push(s2);
+        }
+        confirmDraw(r,p.userId,selected);
+      }
+    },1500+Math.random()*2000);
+  });
+}
+
+function botBet(roomId) {
+  const room=rooms[roomId];
+  if(!room)return;
+  const p=room.players[room.currentTurn];
+  if(!p||!p.isBot)return;
+  setTimeout(()=>{
+    const r=rooms[roomId];
+    if(!r||!r.players[r.currentTurn]?.isBot)return;
+    const bot=r.players[r.currentTurn];
+    if(!bot||!bot.isBot)return;
+    const isFinalBet=r.phase==='bet3'||r.phase==='fbet';
+    const maxBet=isFinalBet?25:15;
+    const rand=Math.random();
+    // House favored — bots rarely fold, often raise
+    if(r.currentBet===0){
+      if(rand<0.5){
+        // Raise
+        const amt=Math.floor(Math.random()*(maxBet-1))+2;
+        playerBetAction(roomId,bot.userId,'raise',amt);
+      } else {
+        playerBetAction(roomId,bot.userId,'check');
+      }
+    } else {
+      if(rand<0.12){
+        // Fold occasionally
+        playerBetAction(roomId,bot.userId,'fold');
+      } else if(rand<0.55){
+        playerBetAction(roomId,bot.userId,'call');
+      } else {
+        const amt=Math.floor(Math.random()*(maxBet-r.currentBet))+r.currentBet+1;
+        playerBetAction(roomId,bot.userId,'raise',Math.min(amt,maxBet));
+      }
+    }
+  },1200+Math.random()*2500);
+}
+
+function botDeclare(roomId) {
+  const room=rooms[roomId];
+  if(!room||room.phase!=='decl')return;
+  const p=room.players[room.currentTurn];
+  if(!p||!p.isBot)return;
+  setTimeout(()=>{
+    const r=rooms[roomId];
+    if(!r||r.phase!=='decl')return;
+    const bot=r.players[r.currentTurn];
+    if(!bot||!bot.isBot)return;
+    if(r.gameType==='badugi'){
+      // Declare based on hand quality
+      const valid=isBadugi(bot.hand);
+      if(valid){
+        const lowRanks=evalBadugiLow(bot.hand);
+        const highCard=lowRanks?lowRanks[0]:14;
+        // Low hand if top card is 7 or less
+        playerDeclareBadugi(roomId,bot.userId,highCard<=7?'low':'high');
+      } else {
+        playerDeclareBadugi(roomId,bot.userId,Math.random()<0.5?'high':'low');
+      }
+    } else {
+      // Chain Gang declare
+      const best=bestHand(bot.hand,r.cols);
+      const hasGoodHigh=best.high&&best.high.r>=2;
+      const hasLow=best.low!==null;
+      if(hasGoodHigh&&hasLow&&Math.random()<0.15){
+        playerDeclare(roomId,bot.userId,'swing');
+      } else if(hasGoodHigh&&!hasLow){
+        playerDeclare(roomId,bot.userId,'high');
+      } else if(hasLow&&!hasGoodHigh){
+        playerDeclare(roomId,bot.userId,'low');
+      } else if(hasGoodHigh&&hasLow){
+        playerDeclare(roomId,bot.userId,Math.random()<0.6?'high':'low');
+      } else {
+        playerDeclare(roomId,bot.userId,Math.random()<0.5?'high':'low');
+      }
+    }
+  },1000+Math.random()*2000);
+}
+
+// Hook bot actions into broadcast
+const _broadcastRoom=broadcastRoom;
+function broadcastRoom(roomId) {
+  _broadcastRoom(roomId);
+  const room=rooms[roomId];
+  if(!room)return;
+  if(room.phase==='ante') botAnte(roomId);
+  else if(room.phase==='draw') botDraw(roomId);
+  else if(['bet1','bet2','bet3','bbet','fbet'].includes(room.phase)){
+    const cur=room.players[room.currentTurn];
+    if(cur&&cur.isBot) botBet(roomId);
+  }
+  else if(room.phase==='decl'){
+    const cur=room.players[room.currentTurn];
+    if(cur&&cur.isBot) botDeclare(roomId);
+  }
+}
 app.get('*path',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));
 server.listen(PORT,'0.0.0.0',()=>console.log(`Chain Gang Poker running on port ${PORT}`));

@@ -109,9 +109,9 @@ body { background:#080f08; color:#f0e6c8; font-family:Arial,sans-serif; min-heig
 .action-label { font-size:0.6rem; color:#555; letter-spacing:2px; margin-bottom:8px; }
 .action-btns { display:flex; gap:6px; flex-wrap:wrap; }
 .action-btns .btn { flex:1; min-width:70px; padding:10px 8px; font-size:0.75rem; margin-bottom:0; }
-.bet-row { display:flex; gap:6px; align-items:center; margin-top:8px; }
-.bet-row input { flex:1; background:#111; border:1px solid #333; color:#f0e6c8; font-size:0.9rem; padding:8px; border-radius:8px; outline:none; }
-.bet-row input:focus { border-color:#d4a017; }
+.bet-row { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+.bet-slider { flex:1; min-width:120px; accent-color:#d4a017; cursor:pointer; } .bet-val { font-size:1rem; color:#d4a017; font-weight:700; min-width:40px; text-align:center; }
+
 .log-section { background:#080f08; border:1px solid #1a2a1a; border-radius:8px; padding:8px 10px; max-height:100px; overflow-y:auto; }
 .log-line { font-size:0.68rem; color:#666; padding:2px 0; border-bottom:1px solid #0f1a0f; }
 .log-line.imp { color:#d4a017; }
@@ -448,7 +448,7 @@ function renderChainGang(state) {
         (state.currentBet > 0 ? '<button class="btn btn-blue" onclick="doCall()">CALL $' + state.currentBet + '</button>' : '') +
         '<button class="btn btn-green" onclick="doRaise()">RAISE</button>' +
         '<button class="btn btn-red" onclick="doFold()">FOLD</button>' +
-        '</div><div class="bet-row"><input type="number" id="bet-input" value="' + betVal + '" min="' + (state.currentBet+1) + '"><button class="btn btn-gold btn-sm" onclick="doRaise()">SET RAISE</button></div></div>';
+        '</div><div class="bet-row"><input type="range" id="bet-input" class="bet-slider" min="1" max="'+(state.phase==="bet3"?25:15)+'" value="'+Math.min(betVal,(state.phase==="bet3"?25:15))+'" oninput="betVal=+this.value;var d=document.getElementById("bet-display");if(d)d.textContent="$"+this.value"><span class="bet-val" id="bet-display">$'+Math.min(betVal,(state.phase==="bet3"?25:15))+'</span><button class="btn btn-gold btn-sm" onclick="doRaise()">RAISE</button></div></div>';
     } else if (isBettingPhase && !myTurn) {
       actionHtml = '<div class="action-section"><div class="action-label" style="color:#888">WAITING FOR ' + escHtml(state.players[state.currentTurn]?.displayName || '...') + ' TO BET</div></div>';
     } else if (state.phase === 'decl' && myTurn && !state.myDecl) {
@@ -516,7 +516,7 @@ function renderBadugi(state) {
         (state.currentBet > 0 ? '<button class="btn btn-blue" onclick="doCall()">CALL $' + state.currentBet + '</button>' : '') +
         '<button class="btn btn-green" onclick="doRaise()">RAISE</button>' +
         '<button class="btn btn-red" onclick="doFold()">FOLD</button>' +
-        '</div><div class="bet-row"><input type="number" id="bet-input" value="' + betVal + '" min="' + (state.currentBet+1) + '"><button class="btn btn-gold btn-sm" onclick="doRaise()">SET RAISE</button></div></div>';
+        '</div><div class="bet-row"><input type="range" id="bet-input" class="bet-slider" min="1" max="'+(state.phase==="fbet"?25:15)+'" value="'+Math.min(betVal,(state.phase==="fbet"?25:15))+'" oninput="betVal=+this.value;var d=document.getElementById("bet-display");if(d)d.textContent="$"+this.value"><span class="bet-val" id="bet-display">$'+Math.min(betVal,(state.phase==="fbet"?25:15))+'</span><button class="btn btn-gold btn-sm" onclick="doRaise()">RAISE</button></div></div>';
     } else if (isBettingPhase && !myTurn) {
       actionHtml = '<div class="action-section"><div class="action-label" style="color:#888">WAITING FOR ' + escHtml(state.players[state.currentTurn]?.displayName || '...') + ' TO BET</div></div>';
     } else if (state.phase === 'decl' && myTurn && !state.myDecl) {
