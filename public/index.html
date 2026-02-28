@@ -704,7 +704,20 @@ function checkRebuy(state) {
     document.getElementById('rebuy-modal').style.display='flex';
   } else if(me.chips>0&&me.chips<=20&&state.phase==='ante'){
     const modal=document.getElementById('rebuy-modal');
-    document.getElementById('rebuy-msg').textContent='Running low on chips (
+    document.getElementById('rebuy-msg').textContent='Running low on chips ($'+me.chips+'). Top up to keep playing!';
+    modal.style.display='flex';
+  }
+}
+function doRebuy(amount) {
+  socket.emit('rebuy',{amount});
+  document.getElementById('rebuy-modal').style.display='none';
+}
+function closeRebuy() {
+  document.getElementById('rebuy-modal').style.display='none';
+  leaveRoom();
+}
+</script>
+</body>
 </html>
 +me.chips+'). Top up to keep playing!';
     modal.style.display='flex';
