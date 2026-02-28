@@ -719,18 +719,3 @@ function closeRebuy() {
 </script>
 </body>
 </html>
-+me.chips+'). Top up to keep playing!';
-    modal.style.display='flex';
-  }
-}
-function doRebuy(amount) {
-  socket.emit('rebuy',{amount});
-  document.getElementById('rebuy-modal').style.display='none';
-}
-function closeRebuy() {
-  document.getElementById('rebuy-modal').style.display='none';
-  leaveRoom();
-}
-</script>
-</body>
-</html>
