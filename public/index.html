@@ -662,212 +662,38 @@ function render1333(state) {
   const myTurn = state.players[state.currentTurn]?.isMe;
   const isFolded = state.myFolded;
   const s = state.my1333Score;
-
-  // Score bar
-  let scoreHtml = '';
-  if (s) {
-    const color = s.madeLow ? '#4dff88' : s.madeHigh ? '#d4a017' : s.bust ? '#ff4422' : '#aaa';
-    const label = s.madeLow ? '✅ MADE LOW' : s.madeHigh ? '✅ MADE HIGH' : s.bust ? '💥 BUST' : 'In play';
-    scoreHtml = '<div style="background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
-      '<span style="font-size:0.7rem;color:#555;letter-spacing:2px">YOUR SCORE</span>' +
-      '<span style="font-size:1.3rem;font-weight:700;color:'+color+'">'+s.score+' pts</span>' +
-      '<span style="font-size:0.75rem;color:'+color+'">'+label+'</span>' +
-      '</div>';
-  }
-
-  // My cards
-  let myCardsHtml = '';
-  if (state.myHand && state.myHand.length) {
-    myCardsHtml = '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span><span style="color:#555;font-size:0.6rem">hand[0] = hole card (hidden from others)</span></div>' +
-      '<div class="hole-cards-row">' +
-      state.myHand.map((c,i) => {
-        const label = i===0 ? '<div class="card-label">HOLE</div>' : '<div class="card-label">UP</div>';
-        return '<div>' + cardHtml(c, false, null) + label + '</div>';
-      }).join('') +
-      '</div></div>';
-  }
-
-  // Other players visible cards
-  let othersHtml = '<div class="players-row">' + state.players.map((p,i) => {
-    const isActive = i === state.currentTurn && state.phase === 'hit';
+  const color = s ? (s.madeLow ? '#4dff88' : s.madeHigh ? '#d4a017' : s.bust ? '#ff4422' : '#aaa') : '#aaa';
+  const label = s ? (s.madeLow ? 'MADE LOW' : s.madeHigh ? 'MADE HIGH' : s.bust ? 'BUST' : 'In play') : '';
+  const scoreHtml = s ? '<div style="background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.7rem;color:#555;letter-spacing:2px">YOUR SCORE</span><span style="font-size:1.3rem;font-weight:700;color:'+color+'">'+s.score+' pts</span><span style="font-size:0.75rem;color:'+color+'">'+label+'</span></div>' : '';
+  const myCardsHtml = state.myHand && state.myHand.length ? '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span></div><div class="hole-cards-row">' + state.myHand.map((card,i) => '<div>' + cardHtml(card,false,null) + '<div class="card-label">'+(i===0?'HOLE':'UP')+'</div></div>').join('') + '</div></div>' : '';
+  const othersHtml = '<div class="players-row">' + state.players.map((p,i) => {
+    const isActive = i===state.currentTurn && state.phase==='hit';
     const stayedBadge = p.stayed ? '<div style="font-size:0.6rem;color:#4dff88">STAYED</div>' : '';
-    const scoreBadge = p.score1333 !== null ? '<div style="font-size:0.65rem;color:#d4a017">'+p.score1333+' pts</div>' : '';
-    const visCards = p.visibleCards && p.visibleCards.length ?
-      '<div style="display:flex;gap:2px;margin-top:4px;justify-content:center">' +
-      p.visibleCards.map(vc => cardSmallHtml(vc, false)).join('') +
-      '</div>' : '';
-    return '<div class="player-chip'+(isActive?' active-turn':'')+(p.folded?' folded':'')+'">' +
-      '<div class="pc-av">'+p.avatar+(p.isMe?'⭐':'')+'</div>' +
-      '<div class="pc-name">'+escHtml(p.displayName)+'</div>' +
-      '<div class="pc-chips">
-  const me=state.players.find(p=>p.isMe);
-  if(!me)return;
-  if(me.chips<=0&&state.phase==='ante'){
-    document.getElementById('rebuy-modal').style.display='flex';
-  } else if(me.chips>0&&me.chips<=20&&state.phase==='ante'){
-    const modal=document.getElementById('rebuy-modal');
-    document.getElementById('rebuy-msg').textContent='Running low on chips (
-</html>
-+me.chips+'). Top up to keep playing!';
-    modal.style.display='flex';
-  }
-}
-function doRebuy(amount) {
-  socket.emit('rebuy',{amount});
-  document.getElementById('rebuy-modal').style.display='none';
-}
-function closeRebuy() {
-  document.getElementById('rebuy-modal').style.display='none';
-  leaveRoom();
-}
-</script>
-</body>
-</html>
-+p.chips+'</div>' +
-      (p.bet>0?'<div class="pc-bet">bet 
-  const me=state.players.find(p=>p.isMe);
-  if(!me)return;
-  if(me.chips<=0&&state.phase==='ante'){
-    document.getElementById('rebuy-modal').style.display='flex';
-  } else if(me.chips>0&&me.chips<=20&&state.phase==='ante'){
-    const modal=document.getElementById('rebuy-modal');
-    document.getElementById('rebuy-msg').textContent='Running low on chips (
-</html>
-+me.chips+'). Top up to keep playing!';
-    modal.style.display='flex';
-  }
-}
-function doRebuy(amount) {
-  socket.emit('rebuy',{amount});
-  document.getElementById('rebuy-modal').style.display='none';
-}
-function closeRebuy() {
-  document.getElementById('rebuy-modal').style.display='none';
-  leaveRoom();
-}
-</script>
-</body>
-</html>
-+p.bet+'</div>':'') +
-      stayedBadge + scoreBadge + visCards +
-      '</div>';
+    const scoreBadge = p.score1333!==null && p.score1333!==undefined ? '<div style="font-size:0.65rem;color:#d4a017">'+p.score1333+' pts</div>' : '';
+    const visCards = p.visibleCards && p.visibleCards.length ? '<div style="display:flex;gap:2px;margin-top:4px;justify-content:center">'+p.visibleCards.map(vc=>cardSmallHtml(vc,false)).join('')+'</div>' : '';
+    return '<div class="player-chip'+(isActive?' active-turn':'')+(p.folded?' folded':'')+'"><div class="pc-av">'+p.avatar+(p.isMe?'&#11088;':'')+'</div><div class="pc-name">'+escHtml(p.displayName)+'</div><div class="pc-chips">$'+p.chips+'</div>'+(p.bet>0?'<div class="pc-bet">bet $'+p.bet+'</div>':'')+stayedBadge+scoreBadge+visCards+'</div>';
   }).join('') + '</div>';
-
-  // Action buttons
   let actionHtml = '';
   if (!isFolded) {
-    if (state.phase === 'ante') {
+    if (state.phase==='ante') {
       actionHtml = '<div class="action-section"><div class="action-label">POST ANTE $1</div><div class="action-btns"><button class="btn btn-gold" onclick="doAnte()">POST ANTE</button></div></div>';
-    } else if (state.phase === 'bet' && myTurn) {
-      const isFinal = false;
-      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash">YOUR TURN — BET ($1-$10)</div><div class="action-btns">' +
-        (state.currentBet===0?'<button class="btn btn-blue" onclick="doCheck()">CHECK</button>':'') +
-        (state.currentBet>0?'<button class="btn btn-blue" onclick="doCall()">CALL 
-  const me=state.players.find(p=>p.isMe);
-  if(!me)return;
-  if(me.chips<=0&&state.phase==='ante'){
-    document.getElementById('rebuy-modal').style.display='flex';
-  } else if(me.chips>0&&me.chips<=20&&state.phase==='ante'){
-    const modal=document.getElementById('rebuy-modal');
-    document.getElementById('rebuy-msg').textContent='Running low on chips (
-</html>
-+me.chips+'). Top up to keep playing!';
-    modal.style.display='flex';
-  }
-}
-function doRebuy(amount) {
-  socket.emit('rebuy',{amount});
-  document.getElementById('rebuy-modal').style.display='none';
-}
-function closeRebuy() {
-  document.getElementById('rebuy-modal').style.display='none';
-  leaveRoom();
-}
-</script>
-</body>
-</html>
-+state.currentBet+'</button>':'') +
-        '<button class="btn btn-green" onclick="doRaise()">RAISE</button>' +
-        '<button class="btn btn-red" onclick="doFold()">FOLD</button>' +
-        '</div><div class="bet-row"><input type="range" id="bet-input" class="bet-slider" min="1" max="10" value="'+Math.min(betVal,10)+'" oninput="betVal=+this.value;var d=document.getElementById(\'bet-display\');if(d)d.textContent=\'$\'+this.value"><span class="bet-val" id="bet-display">
-  const me=state.players.find(p=>p.isMe);
-  if(!me)return;
-  if(me.chips<=0&&state.phase==='ante'){
-    document.getElementById('rebuy-modal').style.display='flex';
-  } else if(me.chips>0&&me.chips<=20&&state.phase==='ante'){
-    const modal=document.getElementById('rebuy-modal');
-    document.getElementById('rebuy-msg').textContent='Running low on chips (
-</html>
-+me.chips+'). Top up to keep playing!';
-    modal.style.display='flex';
-  }
-}
-function doRebuy(amount) {
-  socket.emit('rebuy',{amount});
-  document.getElementById('rebuy-modal').style.display='none';
-}
-function closeRebuy() {
-  document.getElementById('rebuy-modal').style.display='none';
-  leaveRoom();
-}
-</script>
-</body>
-</html>
-+Math.min(betVal,10)+'</span><button class="btn btn-gold btn-sm" onclick="doRaise()">RAISE</button></div></div>';
-    } else if (state.phase === 'bet' && !myTurn) {
+    } else if (state.phase==='bet' && myTurn) {
+      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash">YOUR TURN — BET ($1-$10)</div><div class="action-btns">'+(state.currentBet===0?'<button class="btn btn-blue" onclick="doCheck()">CHECK</button>':'')+(state.currentBet>0?'<button class="btn btn-blue" onclick="doCall()">CALL $'+state.currentBet+'</button>':'')+'<button class="btn btn-green" onclick="doRaise()">RAISE</button><button class="btn btn-red" onclick="doFold()">FOLD</button></div><div class="bet-row"><input type="range" id="bet-input" class="bet-slider" min="1" max="10" value="'+Math.min(betVal,10)+'" oninput="betVal=+this.value;var d=document.getElementById('bet-display');if(d)d.textContent='$'+this.value"><span class="bet-val" id="bet-display">$'+Math.min(betVal,10)+'</span></div></div>';
+    } else if (state.phase==='bet' && !myTurn) {
       actionHtml = '<div class="action-section"><div class="action-label" style="color:#888">WAITING FOR '+escHtml(state.players[state.currentTurn]?.displayName||'...')+' TO BET</div></div>';
-    } else if (state.phase === 'hit' && myTurn && s && !s.stayed) {
-      const score = s ? s.score : 0;
-      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash" style="color:#ff8844">HIT OR STAY? ('+score+' pts)</div><div class="action-btns">' +
-        '<button class="btn btn-green" onclick="doHit1333()">HIT 🃏</button>' +
-        '<button class="btn btn-gold" onclick="doStay1333()">STAY ✋</button>' +
-        '<button class="btn btn-red" onclick="doFold()">FOLD</button>' +
-        '</div></div>';
-    } else if (state.phase === 'hit' && !myTurn) {
+    } else if (state.phase==='hit' && myTurn && s && !s.bust) {
+      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash" style="color:#ff8844">HIT OR STAY? ('+s.score+' pts)</div><div class="action-btns"><button class="btn btn-green" onclick="doHit1333()">HIT</button><button class="btn btn-gold" onclick="doStay1333()">STAY</button><button class="btn btn-red" onclick="doFold()">FOLD</button></div></div>';
+    } else if (state.phase==='hit' && !myTurn) {
       actionHtml = '<div class="action-section"><div class="action-label" style="color:#888">WAITING FOR '+escHtml(state.players[state.currentTurn]?.displayName||'...')+' TO HIT OR STAY</div></div>';
-    } else if (state.phase === 'hit' && myTurn && s && s.stayed) {
-      actionHtml = '<div class="action-section"><div class="action-label" style="color:#4dff88">YOU STAYED — '+s.score+' pts</div></div>';
+    } else if (state.phase==='hit' && s && s.stayed) {
+      actionHtml = '<div class="action-section"><div class="action-label" style="color:#4dff88">YOU STAYED</div></div>';
     }
   } else {
     actionHtml = '<div class="action-section"><div class="action-label" style="color:#666">YOU FOLDED</div></div>';
   }
-
-  const logHtml = '<div class="log-section" id="chat-log">' +
-    (state.log||[]).map(l=>'<div class="log-line '+l.type+'">'+escHtml(l.msg)+'</div>').join('') + '</div>';
-
-  document.getElementById('game-content').innerHTML = '<div class="game-wrap">' +
-    '<div class="top-bar"><span class="pot-display">POT: 
-  const me=state.players.find(p=>p.isMe);
-  if(!me)return;
-  if(me.chips<=0&&state.phase==='ante'){
-    document.getElementById('rebuy-modal').style.display='flex';
-  } else if(me.chips>0&&me.chips<=20&&state.phase==='ante'){
-    const modal=document.getElementById('rebuy-modal');
-    document.getElementById('rebuy-msg').textContent='Running low on chips (
-</html>
-+me.chips+'). Top up to keep playing!';
-    modal.style.display='flex';
-  }
+  const logHtml = '<div class="log-section" id="chat-log">'+(state.log||[]).map(l=>'<div class="log-line '+l.type+'">'+escHtml(l.msg)+'</div>').join('')+'</div>';
+  document.getElementById('game-content').innerHTML = '<div class="game-wrap"><div class="top-bar"><span class="pot-display">POT: $'+state.pot+'</span><span class="phase-badge" style="background:#1a0d00;color:#ff8844">'+phaseLabel(state.phase)+'</span><button class="btn btn-gray btn-sm" onclick="leaveRoom()">LEAVE</button></div>'+othersHtml+scoreHtml+myCardsHtml+actionHtml+logHtml+'<div class="chat-row"><input class="chat-input" id="chat-input" placeholder="Say something..." maxlength="100" onkeydown="if(event.key==='Enter')sendChat()"><button class="btn btn-gray btn-sm" onclick="sendChat()">SEND</button></div></div>';
 }
-function doRebuy(amount) {
-  socket.emit('rebuy',{amount});
-  document.getElementById('rebuy-modal').style.display='none';
-}
-function closeRebuy() {
-  document.getElementById('rebuy-modal').style.display='none';
-  leaveRoom();
-}
-</script>
-</body>
-</html>
-+state.pot+'</span>' +
-    '<span class="phase-badge" style="background:#1a0d00;color:#ff8844">'+phaseLabel(state.phase)+'</span>' +
-    '<button class="btn btn-gray btn-sm" onclick="leaveRoom()">LEAVE</button></div>' +
-    othersHtml + scoreHtml + myCardsHtml + actionHtml + logHtml +
-    '<div class="chat-row"><input class="chat-input" id="chat-input" placeholder="Say something..." maxlength="100" onkeydown="if(event.key==='Enter')sendChat()"><button class="btn btn-gray btn-sm" onclick="sendChat()">SEND</button></div>' +
-    '</div>';
-}
-
 function doHit1333() { socket.emit('hit1333'); }
 function doStay1333() { socket.emit('stay1333'); }
 
