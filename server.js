@@ -226,8 +226,9 @@ function sanitizeForPlayer(room,userId) {
   }
   let my1333Score=null;
   if(room.gameType==='1333'&&me&&me.hand&&me.hand.length>=2){
-    const score=calc1333Score(me.hand);
-    my1333Score={score,madeLow:isMadeLow(score),madeHigh:isMadeHigh(score),bust:isBust(score),holeCard:me.hand[0],upCards:me.hand.slice(1)};
+    const score=calc1535Score(me.hand).score;
+    const visScore=calc1535VisibleScore(me.hand);
+    my1333Score={score,visScore:visScore.score,visDisplay:visScore.display,madeLow:is1535Low(score),madeHigh:is1535High(score),bust:is1535Bust(score),stayed:me.stayed,holeCard:me.hand[0],upCards:me.hand.slice(1),display:calc1535Score(me.hand).display};
   }
   let myBadugiHand=null;
   if(room.gameType==='badugi'&&me&&me.hand&&me.hand.length===4){
@@ -249,7 +250,8 @@ function sanitizeForPlayer(room,userId) {
       cardCount:p.hand?p.hand.length:0,isMe:p.userId===userId,ready:p.ready,acted:p.acted,drawDone:p.drawDone,
       stayed:p.stayed||false,
       visibleCards:room.gameType==='1333'?p.hand.slice(1):[],
-      score1333:room.gameType==='1333'&&(p.userId===userId||room.phase==='showdown')?calc1333Score(p.hand):null
+      score1333:room.gameType==='1333'&&(p.userId===userId||room.phase==='showdown')?calc1535Score(p.hand).score:null,
+      visScore1333:room.gameType==='1333'?calc1535VisibleScore(p.hand).display:null
     })),
     currentTurn:room.currentTurn,winner:room.winner||null
   };
@@ -304,7 +306,7 @@ function advanceTurn(room) {
   broadcastRoom(room.id);
 }
 function endBettingRound(room) {
-  if(room.gameType==='1333'){end1333BettingRound(room);return;}
+  if(room.gameType==='1333'){end1535BettingRound(room);return;}
   if(room.gameType==='badugi'){
     if(room.phase==='bbet'){
       if(room.drawRound<3){
@@ -363,7 +365,7 @@ function startGame(roomId) {
   const room=rooms[roomId];
   if(!room||room.players.length<2)return;
   if(room.gameType==='badugi'){startBadugiGame(roomId);return;}
-  if(room.gameType==='1333'){start1333Game(roomId);return;}
+  if(room.gameType==='1333'){start1535Game(roomId);return;}
   const deck=shuffle(makeDeck());
   let idx=0;
   const deal=n=>{const c=deck.slice(idx,idx+n);idx+=n;return c;};
@@ -659,7 +661,7 @@ io.on('connection',socket=>{
     addLog(room,`${p.displayName} posted ante.`);
     broadcastRoom(socket.roomId);
     if(room.gameType==='badugi')checkAllAntedBadugi(socket.roomId);
-    else if(room.gameType==='1333')checkAllAnted1333(socket.roomId);
+    else if(room.gameType==='1333')checkAllAnted1535(socket.roomId);
     else checkAllAnted(socket.roomId);
   });
   socket.on('selectDraw',({selected})=>{
@@ -729,12 +731,12 @@ io.on('connection',socket=>{
   socket.on('hit1333',()=>{
     const u=socketUser[socket.id];
     if(!u)return;
-    player1333Hit(socket.roomId,u.userId);
+    player1535Hit(socket.roomId,u.userId);
   });
   socket.on('stay1333',()=>{
     const u=socketUser[socket.id];
     if(!u)return;
-    player1333Stay(socket.roomId,u.userId);
+    player1535Stay(socket.roomId,u.userId);
   });
   socket.on('leaveRoom',()=>leaveCurrentRoom(socket));
   socket.on('disconnect',()=>{
@@ -778,98 +780,79 @@ io.on('connection',socket=>{
   }
 });
 
-// ── 13/33 GAME ──────────────────────────────────────────
+// ── 15/35 GAME v3 ────────────────────────────────────────
 
-function calc1333Score(hand, useAceHigh) {
-  let score = 0;
+function calc1535Score(hand) {
+  let base = 0;
   let aces = 0;
   hand.forEach(c => {
-    if (c.v === 'A') { aces++; score += 1; }
-    else if (['J','Q','K'].includes(c.v)) score += 0.5;
-    else score += parseInt(c.v);
+    if (c.v === 'A') aces++;
+    else if (['J','Q','K'].includes(c.v)) base += 0.5;
+    else base += parseInt(c.v);
   });
-  // Try to use aces as 11 if it helps reach 33-35 range
+  let score = base + aces;
   for (let i = 0; i < aces; i++) {
     if (score + 10 <= 35) score += 10;
   }
-  return score;
+  const scoreLow = base + aces;
+  let display = score + '';
+  if (aces > 0 && scoreLow !== score) display = scoreLow + ' or ' + score;
+  return { score, scoreLow, display };
 }
 
-function isMadeLow(score) { return score >= 13 && score <= 15; }
-function isMadeHigh(score) { return score >= 33 && score <= 35; }
-function isBust(score) { return score > 35; }
+function calc1535VisibleScore(hand) {
+  return calc1535Score(hand.slice(1));
+}
 
-function start1333Game(roomId) {
+function is1535Low(score) { return score >= 13 && score <= 15; }
+function is1535High(score) { return score >= 33 && score <= 35; }
+function is1535Bust(score) { return score > 35; }
+
+function start1535Game(roomId) {
   const room = rooms[roomId];
   if (!room || room.players.length < 2) return;
   const deck = shuffle(makeDeck());
   let idx = 0;
-  const deal = n => { const c = deck.slice(idx, idx+n); idx += n; return c; };
-  room.deck = deck; room.deckIdx = idx;
-  room.pot = room.pot || 0;
+  room.deck = deck; room.deckIdx = 0;
   room.currentBet = 0;
   room.log = [];
   room.hitRound = 0;
   room.players.forEach(p => {
-    const hole = deal(1)[0];
-    const up = deal(1)[0];
-    p.hand = [hole, up]; // hand[0] = hole (face down), hand[1+] = face up
+    p.hand = [deck[idx++], deck[idx++]];
     p.bet = 0; p.folded = false; p.stayed = false;
     p.decl = null; p.ready = false; p.acted = false;
     p.drawDone = false; p.selectedDraw = [];
   });
   room.deckIdx = idx;
-  room.phase = 'ante';
-  room.ante = 1;
-  addLog(room, '13/33! One up, one down. Post your $1 ante.', 'imp');
+  if (room.pot > 0) {
+    room.phase = 'hit';
+    room.hitRound = 1;
+    const first = room.players.findIndex(p => !p.folded);
+    room.currentTurn = first >= 0 ? first : 0;
+    addLog(room, 'POT ROLLS OVER! Fresh cards — up card showing. Hit or Stay?', 'imp');
+  } else {
+    room.phase = 'ante';
+    room.ante = 1;
+    addLog(room, '15/35! Cards dealt. Post $1 ante to flip your up card.', 'imp');
+  }
   broadcastRoom(roomId);
 }
 
-function checkAllAnted1333(roomId) {
+function checkAllAnted1535(roomId) {
   const room = rooms[roomId];
   if (!room) return;
   const active = room.players.filter(p => !p.folded);
   if (active.every(p => p.ready)) {
     active.forEach(p => { p.ready = false; });
-    start1333Betting(room, 'bet');
+    room.phase = 'hit';
+    room.hitRound = 1;
+    const first = room.players.findIndex(p => !p.folded);
+    room.currentTurn = first >= 0 ? first : 0;
+    addLog(room, 'Up cards showing! Hit or Stay?', 'imp');
+    broadcastRoom(roomId);
   }
 }
-
-function start1333Betting(room, phase) {
-  room.phase = phase;
-  room.currentBet = 0;
-  room.players.forEach(p => { p.bet = 0; p.acted = false; });
-  const firstActive = room.players.findIndex(p => !p.folded && !p.stayed);
-  room.currentTurn = firstActive >= 0 ? firstActive : room.players.findIndex(p => !p.folded);
-  addLog(room, 'Place your bets! ($1-$10)', 'imp');
-  broadcastRoom(room.id);
-}
-
-function end1333BettingRound(room) {
-  const active = room.players.filter(p => !p.folded);
-  if (active.length <= 1) { earlyWin(room); return; }
-  // Check if all active players have stayed or busted
-  const stillPlaying = active.filter(p => !p.stayed && !isBust(calc1333Score(p.hand)));
-  if (stillPlaying.length === 0) {
-    do1333Showdown(room);
-    return;
-  }
-  // Start hit round
-  room.hitRound++;
-  room.phase = 'hit';
-  room.players.forEach(p => { p.drawDone = false; });
-  // Find first active non-stayed non-bust player
-  let first = -1;
-  for (let i = 0; i < room.players.length; i++) {
-    const p = room.players[i];
-    if (!p.folded && !p.stayed && !isBust(calc1333Score(p.hand))) { first = i; break; }
-  }
-  room.currentTurn = first >= 0 ? first : 0;
-  addLog(room, `Hit round ${room.hitRound} — Hit or Stay?`, 'imp');
-  broadcastRoom(room.id);
-}
-
-function player1333Hit(roomId, userId) {
+function player1535Hit(roomId, userId) {
   const room = rooms[roomId];
   if (!room || room.phase !== 'hit') return;
   const pIdx = room.players.findIndex(p => p.userId === userId);
@@ -878,127 +861,173 @@ function player1333Hit(roomId, userId) {
   if (p.folded || p.stayed) return;
   const newCard = room.deck[room.deckIdx++];
   p.hand.push(newCard);
-  const score = calc1333Score(p.hand);
-  if (isBust(score)) {
-    addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} — BUST! (${score} pts)`, 'imp');
-    p.stayed = true; // treat bust as done
+  const { score, display } = calc1535Score(p.hand);
+  if (is1535Bust(score)) {
+    addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} — BUST! (${display} pts)`, 'imp');
+    p.stayed = true;
   } else {
-    addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} (${score} pts)`);
+    const vis = calc1535VisibleScore(p.hand);
+    addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} (showing: ${vis.display} pts)`);
   }
-  advance1333Turn(room);
+  advance1535Turn(room);
 }
 
-function player1333Stay(roomId, userId) {
+function player1535Stay(roomId, userId) {
   const room = rooms[roomId];
   if (!room || room.phase !== 'hit') return;
   const pIdx = room.players.findIndex(p => p.userId === userId);
   if (pIdx !== room.currentTurn) return;
   const p = room.players[pIdx];
   if (p.folded || p.stayed) return;
-  const score = calc1333Score(p.hand);
+  const vis = calc1535VisibleScore(p.hand);
   p.stayed = true;
-  addLog(room, `${p.displayName} stays at ${score} pts.`);
-  advance1333Turn(room);
+  addLog(room, `${p.displayName} stays. (showing: ${vis.display} pts)`);
+  advance1535Turn(room);
 }
 
-function advance1333Turn(room) {
+function advance1535Turn(room) {
   const active = room.players.filter(p => !p.folded);
-  // Find next player who hasn't stayed/busted
+  if (active.length <= 1) { earlyWin(room); return; }
   let next = (room.currentTurn + 1) % room.players.length;
   let loops = 0;
   while (loops < room.players.length) {
     const p = room.players[next];
-    if (!p.folded && !p.stayed && !isBust(calc1333Score(p.hand))) break;
+    if (!p.folded && !p.stayed) break;
     next = (next + 1) % room.players.length;
     loops++;
   }
-  // If everyone is done with this hit round
-  const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed && !isBust(calc1333Score(p.hand)));
+  const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed);
   if (stillNeedHit.length === 0) {
-    // Check if anyone is still playing
-    const stillPlaying = active.filter(p => !p.stayed || (!isBust(calc1333Score(p.hand)) && !isMadeLow(calc1333Score(p.hand)) && !isMadeHigh(calc1333Score(p.hand))));
-    start1333Betting(room, 'bet');
+    const notBust = active.filter(p => !is1535Bust(calc1535Score(p.hand).score));
+    if (notBust.length === 0) {
+      addLog(room, 'Everyone busted! Dealing fresh cards — no ante needed.', 'imp');
+      broadcastRoom(room.id);
+      setTimeout(() => {
+        if (!rooms[room.id]) return;
+        const deck2 = shuffle(makeDeck());
+        let idx2 = 0;
+        room.players.forEach(p => {
+          if (!p.folded) {
+            p.hand = [deck2[idx2++], deck2[idx2++]];
+            p.stayed = false; p.acted = false; p.drawDone = false;
+          }
+        });
+        room.deck = deck2; room.deckIdx = idx2;
+        room.phase = 'hit';
+        room.hitRound++;
+        const first = room.players.findIndex(p => !p.folded);
+        room.currentTurn = first >= 0 ? first : 0;
+        addLog(room, 'Fresh cards dealt! Hit or Stay?', 'imp');
+        broadcastRoom(room.id);
+      }, 3000);
+    } else {
+      start1535Betting(room);
+    }
   } else {
     room.currentTurn = next;
     broadcastRoom(room.id);
   }
 }
 
-function do1333Showdown(room) {
+function start1535Betting(room) {
+  room.phase = 'bet';
+  room.currentBet = 0;
+  room.players.forEach(p => { p.bet = 0; p.acted = false; });
+  const first = room.players.findIndex(p => !p.folded);
+  room.currentTurn = first >= 0 ? first : 0;
+  addLog(room, 'Bet round! ($1-$10)', 'imp');
+  broadcastRoom(room.id);
+}
+
+function end1535BettingRound(room) {
+  const active = room.players.filter(p => !p.folded);
+  if (active.length <= 1) { earlyWin(room); return; }
+  const stillPlaying = active.filter(p => !p.stayed);
+  if (stillPlaying.length === 0) {
+    do1535Showdown(room);
+  } else {
+    room.hitRound++;
+    room.phase = 'hit';
+    room.players.forEach(p => { p.acted = false; });
+    const first = room.players.findIndex(p => !p.folded && !p.stayed);
+    room.currentTurn = first >= 0 ? first : room.players.findIndex(p => !p.folded);
+    addLog(room, `Hit round ${room.hitRound} — Hit or Stay?`, 'imp');
+    broadcastRoom(room.id);
+  }
+}
+function do1535Showdown(room) {
   room.phase = 'showdown';
   const active = room.players.filter(p => !p.folded);
+  active.forEach(p => {
+    const { score, display } = calc1535Score(p.hand);
+    const status = is1535Low(score) ? 'LOW' : is1535High(score) ? 'HIGH' : 'BUST';
+    addLog(room, `${p.displayName} reveals hole card ${p.hand[0].v}${p.hand[0].s} — ${display} pts [${status}]`, 'imp');
+  });
   const results = active.map(p => {
-    const score = calc1333Score(p.hand);
-    return { ...p, score, madeLow: isMadeLow(score), madeHigh: isMadeHigh(score), bust: isBust(score) };
+    const { score } = calc1535Score(p.hand);
+    return { ...p, score, madeLow: is1535Low(score), madeHigh: is1535High(score) };
   });
   const lowPlayers = results.filter(r => r.madeLow);
   const highPlayers = results.filter(r => r.madeHigh);
   let anyWinner = false;
   const half = Math.floor(room.pot / 2);
+  const remainder = room.pot - half * 2;
   if (lowPlayers.length) {
     anyWinner = true;
-    lowPlayers.sort((a, b) => b.score - a.score); // closest to 15 wins
+    lowPlayers.sort((a, b) => b.score - a.score);
     const lWin = lowPlayers[0];
     const rp = room.players.find(p => p.userId === lWin.userId);
     if (rp) rp.chips += half;
-    db.updateUser(lWin.userId, { chips: (db.findUser(u => u.id === lWin.userId) || {chips:0}).chips + half });
-    addLog(room, `LOW (${half}): ${lWin.displayName} — ${lWin.score} pts`, 'win');
+    db.updateUser(lWin.userId, { chips: (db.findUser(u => u.id === lWin.userId)||{chips:0}).chips + half });
+    addLog(room, `LOW ($${half}): ${lWin.displayName} wins with ${lWin.score} pts!`, 'win');
   } else { addLog(room, 'LOW: No made hand.'); }
   if (highPlayers.length) {
     anyWinner = true;
-    highPlayers.sort((a, b) => b.score - a.score); // closest to 35 wins
+    highPlayers.sort((a, b) => b.score - a.score);
     const hWin = highPlayers[0];
+    const winAmt = lowPlayers.length ? half + remainder : room.pot;
     const rp = room.players.find(p => p.userId === hWin.userId);
-    if (rp) rp.chips += half;
-    db.updateUser(hWin.userId, { chips: (db.findUser(u => u.id === hWin.userId) || {chips:0}).chips + half, wins: (db.findUser(u => u.id === hWin.userId) || {wins:0}).wins + 1 });
-    addLog(room, `HIGH (${half}): ${hWin.displayName} — ${hWin.score} pts`, 'win');
+    if (rp) rp.chips += winAmt;
+    db.updateUser(hWin.userId, { chips: (db.findUser(u => u.id === hWin.userId)||{chips:0}).chips + winAmt, wins: (db.findUser(u => u.id === hWin.userId)||{wins:0}).wins + 1 });
+    addLog(room, `HIGH ($${winAmt}): ${hWin.displayName} wins with ${hWin.score} pts!`, 'win');
   } else { addLog(room, 'HIGH: No made hand.'); }
   if (!anyWinner) {
-    addLog(room, `NO MADE HANDS — POT ROLLS OVER! Pot: ${room.pot}`, 'imp');
+    addLog(room, `NO MADE HANDS — POT ROLLS OVER! Pot: $${room.pot}`, 'imp');
   } else {
-    if (lowPlayers.length && highPlayers.length) room.pot = 0;
-    else room.pot = room.pot - half;
+    room.pot = lowPlayers.length && highPlayers.length ? 0 : room.pot - half;
   }
   broadcastRoom(room.id);
   setTimeout(() => {
-    if (rooms[room.id]) {
-      room.players.forEach(p => { p.folded = false; p.stayed = false; p.ready = false; p.acted = false; p.drawDone = false; });
-      start1333Game(room.id);
-    }
+    if (!rooms[room.id]) return;
+    room.players.forEach(p => { p.folded=false; p.stayed=false; p.ready=false; p.acted=false; p.drawDone=false; });
+    start1535Game(room.id);
   }, 10000);
 }
 
-// Bot logic for 13/33
-function bot1333Action(roomId) {
+function bot1535Action(roomId) {
   const room = rooms[roomId];
   if (!room) return;
   const p = room.players[room.currentTurn];
   if (!p || !p.isBot) return;
-  if (room.phase === 'hit') {
-    setTimeout(() => {
-      const r = rooms[roomId];
-      if (!r || r.phase !== 'hit') return;
-      const bot = r.players[r.currentTurn];
-      if (!bot || !bot.isBot) return;
-      const score = calc1333Score(bot.hand);
-      // Stay if made, hit if not
-      if (isMadeLow(score) || isMadeHigh(score)) {
-        player1333Stay(roomId, bot.userId);
-      } else if (score < 13) {
-        player1333Hit(roomId, bot.userId); // need more
-      } else if (score > 15 && score < 33) {
-        // In the dead zone — risky hit toward high
-        if (Math.random() < 0.6) player1333Hit(roomId, bot.userId);
-        else player1333Stay(roomId, bot.userId);
-      } else if (score >= 33 && score <= 35) {
-        player1333Stay(roomId, bot.userId);
-      } else if (score > 35) {
-        player1333Stay(roomId, bot.userId); // bust
-      } else {
-        player1333Hit(roomId, bot.userId);
-      }
-    }, 1200 + Math.random() * 1500);
-  }
+  setTimeout(() => {
+    const r = rooms[roomId];
+    if (!r || r.phase !== 'hit') return;
+    const bot = r.players[r.currentTurn];
+    if (!bot || !bot.isBot) return;
+    const { score } = calc1535Score(bot.hand);
+    if (is1535Low(score) || is1535High(score)) {
+      player1535Stay(roomId, bot.userId);
+    } else if (score < 13) {
+      player1535Hit(roomId, bot.userId);
+    } else if (score > 15 && score < 28) {
+      player1535Hit(roomId, bot.userId);
+    } else if (score >= 28 && score <= 32) {
+      if (Math.random() < 0.7) player1535Hit(roomId, bot.userId);
+      else player1535Stay(roomId, bot.userId);
+    } else {
+      player1535Stay(roomId, bot.userId);
+    }
+  }, 1200 + Math.random() * 1500);
 }
 
 // ── BOT SYSTEM ──────────────────────────────────────────
@@ -1064,7 +1093,7 @@ function botAnte(roomId) {
       addLog(r,`${p.displayName} posted ante.`);
       broadcastRoom(roomId);
       if(r.gameType==='badugi')checkAllAntedBadugi(roomId);
-      else if(r.gameType==='1333')checkAllAnted1333(roomId);
+      else if(r.gameType==='1333')checkAllAnted1535(roomId);
       else checkAllAnted(roomId);
     },1000+Math.random()*2000);
   });
@@ -1198,7 +1227,7 @@ function broadcastRoom(roomId) {
   }
   else if(room.phase==='hit'&&room.gameType==='1333'){
     const cur=room.players[room.currentTurn];
-    if(cur&&cur.isBot) bot1333Action(roomId);
+    if(cur&&cur.isBot) bot1535Action(roomId);
   }
 }
 app.get('*path',(req,res)=>res.sendFile(path.join(__dirname,'public','index.html')));

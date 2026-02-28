@@ -662,38 +662,100 @@ function render1333(state) {
   const myTurn = state.players[state.currentTurn]?.isMe;
   const isFolded = state.myFolded;
   const s = state.my1333Score;
-  const color = s ? (s.madeLow ? '#4dff88' : s.madeHigh ? '#d4a017' : s.bust ? '#ff4422' : '#aaa') : '#aaa';
-  const label = s ? (s.madeLow ? 'MADE LOW' : s.madeHigh ? 'MADE HIGH' : s.bust ? 'BUST' : 'In play') : '';
-  const scoreHtml = s ? '<div style="background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.7rem;color:#555;letter-spacing:2px">YOUR SCORE</span><span style="font-size:1.3rem;font-weight:700;color:'+color+'">'+s.score+' pts</span><span style="font-size:0.75rem;color:'+color+'">'+label+'</span></div>' : '';
-  const myCardsHtml = state.myHand && state.myHand.length ? '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span></div><div class="hole-cards-row">' + state.myHand.map((card,i) => '<div>' + cardHtml(card,false,null) + '<div class="card-label">'+(i===0?'HOLE':'UP')+'</div></div>').join('') + '</div></div>' : '';
+  const phase = state.phase;
+
+  // My score display
+  let scoreHtml = '';
+  if (s && phase !== 'ante') {
+    const color = s.madeLow ? '#4dff88' : s.madeHigh ? '#d4a017' : s.bust ? '#ff4422' : '#aaa';
+    const label = s.madeLow ? 'MADE LOW' : s.madeHigh ? 'MADE HIGH' : s.bust ? 'BUST' : 'in play';
+    scoreHtml = '<div style="background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
+      '<span style="font-size:0.65rem;color:#555;letter-spacing:2px">YOUR TOTAL</span>' +
+      '<span style="font-size:1.2rem;font-weight:700;color:'+color+'">'+s.display+' pts</span>' +
+      '<span style="font-size:0.7rem;color:'+color+'">'+label+'</span>' +
+      '</div>' +
+      '<div style="background:#0a0a0a;border:1px solid #1a1a1a;border-radius:6px;padding:6px 12px;margin-bottom:6px;font-size:0.7rem;color:#666">' +
+      'Showing to others: <span style="color:#d4a017">'+s.visDisplay+' pts</span> (hole card hidden)</div>';
+  }
+
+  // My cards
+  let myCardsHtml = '';
+  if (state.myHand && state.myHand.length) {
+    const holeCard = state.myHand[0];
+    const upCards = state.myHand.slice(1);
+    myCardsHtml = '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span></div><div class="hole-cards-row">' +
+      '<div>' + cardHtml(holeCard, false, null) + '<div class="card-label" style="color:#888">HOLE ????</div></div>' +
+      upCards.map(card => '<div>' + cardHtml(card, false, null) + '<div class="card-label">UP</div></div>').join('') +
+      '</div></div>';
+  } else if (phase === 'ante') {
+    myCardsHtml = '<div class="hole-cards-section"><div class="hole-label"><span>YOUR CARDS</span></div>' +
+      '<div class="hole-cards-row">' +
+      '<div><div class="card card-back"></div><div class="card-label">HOLE</div></div>' +
+      '<div><div class="card card-back"></div><div class="card-label">UP</div></div>' +
+      '</div><div style="font-size:0.7rem;color:#888;text-align:center;margin-top:6px">Post ante to reveal your up card</div></div>';
+  }
+
+  // Other players — show visible cards and visible score only
   const othersHtml = '<div class="players-row">' + state.players.map((p,i) => {
-    const isActive = i===state.currentTurn && state.phase==='hit';
-    const stayedBadge = p.stayed ? '<div style="font-size:0.6rem;color:#4dff88">STAYED</div>' : '';
-    const scoreBadge = p.score1333!==null && p.score1333!==undefined ? '<div style="font-size:0.65rem;color:#d4a017">'+p.score1333+' pts</div>' : '';
-    const visCards = p.visibleCards && p.visibleCards.length ? '<div style="display:flex;gap:2px;margin-top:4px;justify-content:center">'+p.visibleCards.map(vc=>cardSmallHtml(vc,false)).join('')+'</div>' : '';
-    return '<div class="player-chip'+(isActive?' active-turn':'')+(p.folded?' folded':'')+'"><div class="pc-av">'+p.avatar+(p.isMe?'&#11088;':'')+'</div><div class="pc-name">'+escHtml(p.displayName)+'</div><div class="pc-chips">$'+p.chips+'</div>'+(p.bet>0?'<div class="pc-bet">bet $'+p.bet+'</div>':'')+stayedBadge+scoreBadge+visCards+'</div>';
+    const isActive = i===state.currentTurn && phase==='hit';
+    const stayedBadge = p.stayed ? '<div style="font-size:0.6rem;color:#4dff88;margin-top:2px">STAYED</div>' : '';
+    const visScore = p.visScore1333 !== null && p.visScore1333 !== undefined && phase !== 'ante'
+      ? '<div style="font-size:0.65rem;color:#d4a017">showing: '+p.visScore1333+' pts</div>' : '';
+    const visCards = p.visibleCards && p.visibleCards.length && phase !== 'ante'
+      ? '<div style="display:flex;gap:2px;margin-top:4px;justify-content:center">'+
+        '<div class="card card-back" style="width:24px;height:34px;font-size:0.4rem"></div>'+
+        p.visibleCards.map(vc=>cardSmallHtml(vc,false)).join('')+'</div>' : '';
+    const fullScore = p.score1333 !== null && p.score1333 !== undefined && phase==='showdown'
+      ? '<div style="font-size:0.7rem;color:#4dff88;margin-top:2px">TOTAL: '+p.score1333+' pts</div>' : '';
+    return '<div class="player-chip'+(isActive?' active-turn':'')+(p.folded?' folded':'')+'">'+
+      '<div class="pc-av">'+p.avatar+(p.isMe?'&#11088;':'')+'</div>'+
+      '<div class="pc-name">'+escHtml(p.displayName)+'</div>'+
+      '<div class="pc-chips">$'+p.chips+'</div>'+
+      (p.bet>0?'<div class="pc-bet">bet $'+p.bet+'</div>':'')+
+      stayedBadge+visScore+visCards+fullScore+
+      '</div>';
   }).join('') + '</div>';
+
+  // Actions
   let actionHtml = '';
   if (!isFolded) {
-    if (state.phase==='ante') {
-      actionHtml = '<div class="action-section"><div class="action-label">POST ANTE $1</div><div class="action-btns"><button class="btn btn-gold" onclick="doAnte()">POST ANTE</button></div></div>';
-    } else if (state.phase==='bet' && myTurn) {
-      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash">YOUR TURN — BET ($1-$10)</div><div class="action-btns">'+(state.currentBet===0?'<button class="btn btn-blue" onclick="doCheck()">CHECK</button>':'')+(state.currentBet>0?'<button class="btn btn-blue" onclick="doCall()">CALL $'+state.currentBet+'</button>':'')+'<button class="btn btn-green" onclick="doRaise()">RAISE</button><button class="btn btn-red" onclick="doFold()">FOLD</button></div><div class="bet-row"><input type="range" id="bet-input" class="bet-slider" min="1" max="10" value="'+Math.min(betVal,10)+'" oninput="betVal=+this.value;var d=document.getElementById(\"bet-display\");if(d)d.textContent=\"$\"+this.value"><span class="bet-val" id="bet-display">$'+Math.min(betVal,10)+'</span></div></div>';
-    } else if (state.phase==='bet' && !myTurn) {
+    if (phase==='ante') {
+      actionHtml = '<div class="action-section"><div class="action-label">POST $1 ANTE TO REVEAL YOUR UP CARD</div><div class="action-btns"><button class="btn btn-gold" onclick="doAnte()">POST ANTE $1</button></div></div>';
+    } else if (phase==='bet' && myTurn) {
+      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash">YOUR TURN — BET ($1-$10)</div><div class="action-btns">'+
+        (state.currentBet===0?'<button class="btn btn-blue" onclick="doCheck()">CHECK</button>':'')+
+        (state.currentBet>0?'<button class="btn btn-blue" onclick="doCall()">CALL $'+state.currentBet+'</button>':'')+
+        '<button class="btn btn-green" onclick="doRaise()">RAISE</button>'+
+        '<button class="btn btn-red" onclick="doFold()">FOLD</button>'+
+        '</div><div class="bet-row"><input type="range" id="bet-input" class="bet-slider" min="1" max="10" value="'+Math.min(betVal,10)+'" oninput="betVal=+this.value;var d=document.getElementById(\"bet-display\");if(d)d.textContent=\"$\"+this.value"><span class="bet-val" id="bet-display">$'+Math.min(betVal,10)+'</span></div></div>';
+    } else if (phase==='bet' && !myTurn) {
       actionHtml = '<div class="action-section"><div class="action-label" style="color:#888">WAITING FOR '+escHtml(state.players[state.currentTurn]?.displayName||'...')+' TO BET</div></div>';
-    } else if (state.phase==='hit' && myTurn && s && !s.bust) {
-      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash" style="color:#ff8844">HIT OR STAY? ('+s.score+' pts)</div><div class="action-btns"><button class="btn btn-green" onclick="doHit1333()">HIT</button><button class="btn btn-gold" onclick="doStay1333()">STAY</button><button class="btn btn-red" onclick="doFold()">FOLD</button></div></div>';
-    } else if (state.phase==='hit' && !myTurn) {
+    } else if (phase==='hit' && myTurn && s && !s.stayed && !s.bust) {
+      actionHtml = '<div class="action-section"><div class="action-label your-turn-flash" style="color:#ff8844">HIT OR STAY? (your total: '+s.display+' pts)</div><div class="action-btns">'+
+        '<button class="btn btn-green" onclick="doHit1333()">HIT</button>'+
+        '<button class="btn btn-gold" onclick="doStay1333()">STAY</button>'+
+        '<button class="btn btn-red" onclick="doFold()">FOLD</button>'+
+        '</div></div>';
+    } else if (phase==='hit' && myTurn && s && s.stayed) {
+      actionHtml = '<div class="action-section"><div class="action-label" style="color:#4dff88">YOU STAYED — '+s.display+' pts</div></div>';
+    } else if (phase==='hit' && !myTurn) {
       actionHtml = '<div class="action-section"><div class="action-label" style="color:#888">WAITING FOR '+escHtml(state.players[state.currentTurn]?.displayName||'...')+' TO HIT OR STAY</div></div>';
-    } else if (state.phase==='hit' && s && s.stayed) {
-      actionHtml = '<div class="action-section"><div class="action-label" style="color:#4dff88">YOU STAYED</div></div>';
+    } else if (phase==='showdown') {
+      actionHtml = '<div class="action-section"><div class="action-label" style="color:#d4a017">SHOWDOWN — HOLE CARDS REVEALED!</div></div>';
     }
   } else {
     actionHtml = '<div class="action-section"><div class="action-label" style="color:#666">YOU FOLDED</div></div>';
   }
+
   const logHtml = '<div class="log-section" id="chat-log">'+(state.log||[]).map(l=>'<div class="log-line '+l.type+'">'+escHtml(l.msg)+'</div>').join('')+'</div>';
-  document.getElementById('game-content').innerHTML = '<div class="game-wrap"><div class="top-bar"><span class="pot-display">POT: $'+state.pot+'</span><span class="phase-badge" style="background:#1a0d00;color:#ff8844">'+phaseLabel(state.phase)+'</span><button class="btn btn-gray btn-sm" onclick="leaveRoom()">LEAVE</button></div>'+othersHtml+scoreHtml+myCardsHtml+actionHtml+logHtml+'<div class="chat-row"><input class="chat-input" id="chat-input" placeholder="Say something..." maxlength="100" onkeydown="if(event.key===\'Enter\')sendChat()"><button class="btn btn-gray btn-sm" onclick="sendChat()">SEND</button></div></div>';
+  document.getElementById('game-content').innerHTML = '<div class="game-wrap">'+
+    '<div class="top-bar"><span class="pot-display">POT: $'+state.pot+'</span>'+
+    '<span class="phase-badge" style="background:#1a0d00;color:#ff8844">'+phaseLabel(phase)+'</span>'+
+    '<button class="btn btn-gray btn-sm" onclick="leaveRoom()">LEAVE</button></div>'+
+    othersHtml+scoreHtml+myCardsHtml+actionHtml+logHtml+
+    '<div class="chat-row"><input class="chat-input" id="chat-input" placeholder="Say something..." maxlength="100" onkeydown="if(event.key===\'Enter\')sendChat()"><button class="btn btn-gray btn-sm" onclick="sendChat()">SEND</button></div></div>';
 }
+
 function doHit1333() { socket.emit('hit1333'); }
 function doStay1333() { socket.emit('stay1333'); }
 
