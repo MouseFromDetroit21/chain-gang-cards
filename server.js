@@ -852,6 +852,7 @@ function checkAllAnted1535(roomId) {
     active.forEach(p => { p.ready = false; });
     room.phase = 'hit';
     room.hitRound = 1;
+    room.players.forEach(p => { p.drawDone = false; });
     const lod=(room.dealerIdx+1)%room.players.length;
     room.currentTurn=lod;
     addLog(room, 'Up cards showing! Starting left of dealer — Hit or Stay?', 'imp');
@@ -875,6 +876,7 @@ function player1535Hit(roomId, userId) {
     const vis = calc1535VisibleScore(p.hand);
     addLog(room, `${p.displayName} hits ${newCard.v}${newCard.s} (showing: ${vis.display} pts)`);
   }
+  p.drawDone = true;
   advance1535Turn(room);
 }
 
@@ -887,6 +889,7 @@ function player1535Stay(roomId, userId) {
   if (p.folded || p.stayed) return;
   const vis = calc1535VisibleScore(p.hand);
   p.stayed = true;
+  p.drawDone = true;
   addLog(room, `${p.displayName} stays. (showing: ${vis.display} pts)`);
   advance1535Turn(room);
 }
@@ -915,11 +918,8 @@ function advance1535Turn(room) {
     next = (next + 1) % room.players.length;
     loops++;
   }
-  const stillNeedHit = room.players.filter(p => !p.folded && !p.stayed);
-  // If only 1 active after others busted/folded, they win
-  if (active.filter(p=>!p.folded).length === 1 && stillNeedHit.length <= 1) {
-    advance1535Turn(room); return;
-  }
+  // Players who need to act this hit round = not folded AND not yet drawn this round
+  const stillNeedHit = room.players.filter(p => !p.folded && !p.drawDone);
   if (stillNeedHit.length === 0) {
     if (active.filter(p=>!p.folded).length === 0) {
       addLog(room, 'Everyone busted! Dealing fresh cards — no ante needed.', 'imp');
@@ -987,7 +987,8 @@ function end1535BettingRound(room) {
   } else {
     room.hitRound++;
     room.phase = 'hit';
-    room.players.forEach(p => { p.acted = false; p.drawDone = false; });
+    // Reset drawDone so everyone acts again this hit round (except folded)
+    room.players.forEach(p => { p.acted = false; if(!p.folded) p.drawDone = false; });
     const lod = (room.dealerIdx+1) % room.players.length;
     let first = lod;
     let loops = 0;
