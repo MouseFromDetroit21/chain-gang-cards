@@ -722,9 +722,9 @@ io.on('connection',socket=>{
     socket.emit('joinedRoom',{roomId:room.id,isPrivate:room.isPrivate,gameType:room.gameType});
     addLog(room,`${u.displayName} joined the table.`,'imp');
     broadcastRoom(room.id);
+    if(!room.isPrivate)scheduleBot(room.id);
     if(room.players.length>=2&&room.phase==='waiting'){
       setTimeout(()=>{if(rooms[room.id]&&room.players.length>=2&&room.phase==='waiting')startGame(room.id);},3000);
-      if(!room.isPrivate)scheduleBot(room.id);
     }
   }
 });
@@ -749,8 +749,9 @@ function makeBotPlayer(gameType) {
 
 function scheduleBot(roomId) {
   const room=rooms[roomId];
-  if(!room||room.isPrivate)return;
-  // First bot after 12 seconds
+  if(!room||room.isPrivate||room.botScheduled)return;
+  room.botScheduled=true;
+  // First bot after 5 seconds
   setTimeout(()=>{
     const r=rooms[roomId];
     if(!r||r.phase!=='waiting'||r.isPrivate)return;
@@ -763,7 +764,7 @@ function scheduleBot(roomId) {
       if(r.players.length>=2&&r.phase==='waiting'){
         setTimeout(()=>{if(rooms[roomId]&&r.phase==='waiting')startGame(roomId);},3000);
       }
-      // Second bot after another 8 seconds if still waiting
+      // Second bot after another 4 seconds if still waiting
       setTimeout(()=>{
         const r2=rooms[roomId];
         if(!r2||r2.phase!=='waiting'||r2.isPrivate)return;
@@ -774,7 +775,7 @@ function scheduleBot(roomId) {
           addLog(r2,`${bot2.displayName} joined the table.`,'imp');
           broadcastRoom(roomId);
         }
-      },8000);
+      },4000);
     }
   },12000);
 }
