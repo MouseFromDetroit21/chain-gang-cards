@@ -1025,7 +1025,11 @@ function advance1535Turn(room) {
       start1535Betting(room);
     }
   } else {
-    room.currentTurn = next;
+    // Only advance turn if we found a valid next player
+    const nextP = room.players[next];
+    if(nextP && !nextP.folded && !nextP.drawDone) {
+      room.currentTurn = next;
+    }
     broadcastRoom(room.id);
   }
 }
