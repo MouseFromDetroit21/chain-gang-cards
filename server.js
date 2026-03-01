@@ -1069,15 +1069,17 @@ function end1535BettingRound(room) {
     setTimeout(() => { if(rooms[room.id]){ room.players.forEach(p=>{p.folded=false;p.stayed=false;p.ready=false;p.acted=false;}); start1535Game(room.id); } }, 8000);
     return;
   }
-  const stillPlaying = active.filter(p => !p.stayed);
-  if (stillPlaying.length === 0) {
-    // All stayed — if anyone has valid hand go to showdown
-    const hasValid = active.some(p => { const {score}=calc1535Score(p.hand); return is1535Low(score)||is1535High(score); });
-    if (hasValid) { do1535Showdown(room); return; }
-    // No valid hands — next hit round, reset stayed so players can hit again
-    active.forEach(p => { p.stayed = false; p.drawDone = false; });
+  const validStayed=active.filter(p=>{const{score}=calc1535Score(p.hand);return(is1535Low(score)||is1535High(score))&&p.stayed;});
+  const hasLowLocked=validStayed.some(p=>is1535Low(calc1535Score(p.hand).score));
+  const hasHighLocked=validStayed.some(p=>is1535High(calc1535Score(p.hand).score));
+  if(hasLowLocked&&hasHighLocked){do1535Showdown(room);return;}
+  const stillNeedHitOrValid=active.filter(p=>{const{score}=calc1535Score(p.hand);return!is1535Low(score)&&!is1535High(score)&&!p.drawDone;});
+  if(stillNeedHitOrValid.length===0){
+    const anyValid=active.some(p=>{const{score}=calc1535Score(p.hand);return is1535Low(score)||is1535High(score);});
+    if(anyValid){do1535Showdown(room);return;}
+    active.forEach(p=>{const{score}=calc1535Score(p.hand);if(!is1535Low(score)&&!is1535High(score)){p.stayed=false;p.drawDone=false;}});
   }
-  if (stillPlaying.length === 0 || true) {
+  if(true){
     room.hitRound++;
     room.phase = 'hit';
     // Reset drawDone so everyone acts again this hit round (except folded)
