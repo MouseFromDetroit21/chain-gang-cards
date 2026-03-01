@@ -734,6 +734,20 @@ io.on('connection',socket=>{
       broadcastRoom(socket.roomId);
     }
     socket.emit('authOk',safeUser(dbUser));
+    // Check if player has a held seat in any room
+    const heldRoom=Object.values(rooms).find(r=>r.players.some(p=>p.userId===dbUser.id&&p.disconnected));
+    if(heldRoom){
+      const p=heldRoom.players.find(p=>p.userId===dbUser.id);
+      if(p){
+        p.disconnected=false;
+        p.disconnectedAt=null;
+        socket.roomId=heldRoom.id;
+        userSocket[dbUser.id]=socket.id;
+        addLog(heldRoom,`${p.displayName} reconnected!`,'imp');
+        broadcastRoom(heldRoom.id);
+        socket.emit('rejoinRoom',{roomId:heldRoom.id,gameType:heldRoom.gameType});
+      }
+    }
   });
   socket.on('hit1333',()=>{
     const u=socketUser[socket.id];
@@ -750,10 +764,35 @@ io.on('connection',socket=>{
     const u=socketUser[socket.id];
     if(u){
       delete userSocket[u.userId];
-      const room=rooms[socket.roomId];
+      const roomId=socket.roomId;
+      const room=rooms[roomId];
       if(room){
-        const p=room.players.find(p=>p.userId===u.userId);
-        if(p){p.folded=true;addLog(room,`${p.displayName} disconnected.`);broadcastRoom(socket.roomId);}
+        const p=room.players.find(pl=>pl.userId===u.userId);
+        if(p){
+          p.disconnected=true;
+          p.disconnectedAt=Date.now();
+          const pIdx=room.players.findIndex(pl=>pl.userId===u.userId);
+          if(room.phase!=='waiting'&&room.phase!=='showdown'){
+            p.folded=true;
+            addLog(room,`${p.displayName} disconnected — auto-folded.`,'imp');
+            if(room.currentTurn===pIdx){
+              if(room.gameType==='1333') advance1535Turn(room);
+              else advanceTurn(room);
+            } else { broadcastRoom(roomId); }
+          }
+          // Hold seat 2 minutes then remove
+          setTimeout(()=>{
+            const r=rooms[roomId];
+            if(!r)return;
+            const pl=r.players.find(p=>p.userId===u.userId);
+            if(pl&&pl.disconnected){
+              r.players=r.players.filter(p=>p.userId!==u.userId);
+              addLog(r,`${pl.displayName} left the table.`,'imp');
+              broadcastRoom(roomId);
+              if(r.players.filter(p=>!p.isBot).length===0) delete rooms[roomId];
+            }
+          },120000);
+        }
       }
     }
     delete socketUser[socket.id];
