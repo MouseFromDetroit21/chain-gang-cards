@@ -280,7 +280,7 @@ function playerBetAction(roomId,userId,action,amount) {
     addLog(room,`${p.displayName} calls $${amt}.`);
   }
   else if(action==='raise'){
-    const isFinal=room.phase==='bet3'||room.phase==='fbet';
+    const isFinal=room.phase==='bet3'||room.phase==='fbet'||room.phase==='bet';
     const maxRaise=isFinal?25:15;
     const amt=Math.min(amount,p.chips,maxRaise);
     if(amt<=room.currentBet)return;
@@ -494,16 +494,16 @@ function startBadugiGame(roomId) {
   const deck=shuffle(makeDeck());
   let idx=0;
   const deal=n=>{const c=deck.slice(idx,idx+n);idx+=n;return c;};
-  const carryPot=room.pot||0;room.deck=deck;room.pot=carryPot;room.currentBet=0;room.drawRound=0;
+  const carryPot=room.pot||0;room.deck=deck;room.pot=0;room.carryPot=carryPot;room.currentBet=0;room.drawRound=0;
   room.players.forEach(p=>{
     p.hand=deal(4);p.bet=0;p.folded=false;
     p.decl=null;p.selectedDraw=[];p.ready=false;p.drawDone=false;p.acted=false;
   });
   room.deckIdx=idx;room.log=[];
   if(carryPot>0){
-    room.phase='draw';
-    room.drawRound=1;
-    addLog(room,'POT ROLLS OVER! New hand — draw round 1 of 3.','imp');
+    room.pot=carryPot;
+    room.phase='ante';
+    addLog(room,`POT ROLLS OVER! ${carryPot} in pot. Post ante to play.`,'imp');
   } else {
     room.phase='ante';
     addLog(room,'Badugi! 4 cards dealt. Post your ante.','imp');
@@ -983,8 +983,12 @@ function end1535BettingRound(room) {
   }
   const stillPlaying = active.filter(p => !p.stayed);
   if (stillPlaying.length === 0) {
-    do1535Showdown(room);
-  } else {
+    // All stayed — check if anyone has valid hand, otherwise next hit round
+    const hasValid = active.some(p => { const {score}=calc1535Score(p.hand); return is1535Low(score)||is1535High(score); });
+    if (hasValid) { do1535Showdown(room); return; }
+    // No valid hands yet — next hit round
+  }
+  if (true) {
     room.hitRound++;
     room.phase = 'hit';
     // Reset drawDone so everyone acts again this hit round (except folded)
