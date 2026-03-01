@@ -814,11 +814,12 @@ io.on('connection',socket=>{
     socket.roomId=null;
   }
   function joinRoom(socket,room,u){
+    if(room.players.length>=5)return socket.emit('error','Table is full!');
     const dbUser=db.findUser(u2=>u2.id===u.userId);
     room.players.push({
       userId:u.userId,username:u.username,displayName:u.displayName,
       avatar:u.avatar,chips:dbUser?dbUser.chips:u.chips,
-      hand:[],bet:0,folded:false,decl:null,ready:false,selectedDraw:[],drawDone:false,acted:false
+      hand:[],bet:0,folded:false,decl:null,ready:false,selectedDraw:[],drawDone:false,acted:false,stayed:false
     });
     socket.join(room.id);
     socket.roomId=room.id;
@@ -826,9 +827,17 @@ io.on('connection',socket=>{
     addLog(room,`${u.displayName} joined the table.`,'imp');
     broadcastRoom(room.id);
     if(!room.isPrivate)scheduleBot(room.id);
-    if(room.players.length>=5)return socket.emit('error','Table is full!');
     if(room.players.length>=2&&room.phase==='waiting'){
       setTimeout(()=>{if(rooms[room.id]&&room.players.length>=2&&room.phase==='waiting')startGame(room.id);},3000);
+    }
+    // If joining during ante phase, deal them in
+    if(room.phase==='ante'&&room.gameType==='1333'){
+      const p=room.players[room.players.length-1];
+      const deck=room.deck;
+      let idx=room.deckIdx;
+      p.hand=[deck[idx++],deck[idx++]];
+      room.deckIdx=idx;
+      broadcastRoom(room.id);
     }
   }
 });
