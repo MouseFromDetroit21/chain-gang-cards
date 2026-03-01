@@ -1071,12 +1071,13 @@ function end1535BettingRound(room) {
   }
   const stillPlaying = active.filter(p => !p.stayed);
   if (stillPlaying.length === 0) {
-    // All stayed — check if anyone has valid hand, otherwise next hit round
+    // All stayed — if anyone has valid hand go to showdown
     const hasValid = active.some(p => { const {score}=calc1535Score(p.hand); return is1535Low(score)||is1535High(score); });
     if (hasValid) { do1535Showdown(room); return; }
-    // No valid hands yet — next hit round
+    // No valid hands — next hit round, reset stayed so players can hit again
+    active.forEach(p => { p.stayed = false; p.drawDone = false; });
   }
-  if (true) {
+  if (stillPlaying.length === 0 || true) {
     room.hitRound++;
     room.phase = 'hit';
     // Reset drawDone so everyone acts again this hit round (except folded)
