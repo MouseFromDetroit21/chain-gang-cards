@@ -186,7 +186,7 @@ body { background:#080f08; color:#f0e6c8; font-family:Arial,sans-serif; min-heig
         <div class="gt-name" style="color:#22ccaa">BADUGI</div>
         <div style="font-size:0.6rem;color:#666;margin-top:2px">4 card, 3 draws</div>
       </div>
-      <div class="game-tab" id="tab-1333" onclick="selectGame('1333')">
+      <div class="game-tab" id="tab-1333" onclick="selectGame('1535')">
         <div class="gt-icon">🎲</div>
         <div class="gt-name" style="color:#ff8844">15/35</div>
         <div style="font-size:0.6rem;color:#666;margin-top:2px">hit or stay</div>
@@ -417,7 +417,7 @@ function renderWaiting(state) {
 }
 function renderGame(state) {
   if (state.gameType === 'badugi') renderBadugi(state);
-  else if (state.gameType === '1333') render1333(state);
+  else if (state.gameType === '1535') render1333(state);
   else renderChainGang(state);
   checkRebuy(state);
 }

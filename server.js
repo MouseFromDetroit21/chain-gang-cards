@@ -244,14 +244,16 @@ function sanitizeForPlayer(room,userId) {
       const ec=vc.map(col=>({pair:col.pair.filter(Boolean),single:col.single})).filter(col=>col.pair.length>0&&col.single);
       if(ec.length>0){
         try{
-          const best=bestHand(me.hand,ec);
-          myBestHand={highName:best.high?best.high.n:null,highCards:best.highCards?best.highCards.map(c=>c.v+c.s):[],lowCards:best.lowCards?best.lowCards.map(c=>c.v+c.s):[],hasLow:best.low!==null};
+          if(me.hand&&me.hand.length>0&&ec.length>0){
+            const best=bestHand(me.hand,ec);
+            myBestHand={highName:best.high?best.high.n:null,highCards:best.highCards?best.highCards.map(c=>c.v+c.s):[],lowCards:best.lowCards?best.lowCards.map(c=>c.v+c.s):[],hasLow:best.low!==null};
+          }
         }catch(e){myBestHand=null;}
       }
     }
   }
   let my1333Score=null;
-  if(room.gameType==='1333'&&me&&me.hand&&me.hand.length>=2){
+  if(room.gameType==='1535'&&me&&me.hand&&me.hand.length>=2){
     const score=calc1535Score(me.hand).score;
     const visScore=calc1535VisibleScore(me.hand);
     my1333Score={score,visScore:visScore.score,visDisplay:visScore.display,madeLow:is1535Low(score),madeHigh:is1535High(score),bust:is1535Bust(score),stayed:me.stayed,holeCard:me.hand[0],upCards:me.hand.slice(1),display:calc1535Score(me.hand).display};
@@ -275,9 +277,9 @@ function sanitizeForPlayer(room,userId) {
       decl:room.phase==='showdown'||p.userId===userId?p.decl:p.decl?'hidden':null,
       cardCount:p.hand?p.hand.length:0,isMe:p.userId===userId,ready:p.ready,acted:p.acted,drawDone:p.drawDone,
       stayed:p.stayed||false,
-      visibleCards:room.gameType==='1333'?p.hand.slice(1):[],
-      score1333:room.gameType==='1333'&&(p.userId===userId||room.phase==='showdown')?calc1535Score(p.hand).score:null,
-      visScore1333:room.gameType==='1333'?calc1535VisibleScore(p.hand).display:null
+      visibleCards:room.gameType==='1535'&&p.hand&&p.hand.length>1?p.hand.slice(1):[],
+      score1333:room.gameType==='1535'&&p.hand&&p.hand.length>=2&&(p.userId===userId||room.phase==='showdown')?calc1535Score(p.hand).score:null,
+      visScore1333:room.gameType==='1535'&&p.hand&&p.hand.length>=2?calc1535VisibleScore(p.hand).display:null
     })),
     currentTurn:room.currentTurn,winner:room.winner||null
   };
@@ -285,6 +287,8 @@ function sanitizeForPlayer(room,userId) {
 function _broadcastRoom(roomId) {
   const room=rooms[roomId];
   if(!room)return;
+  // Guard currentTurn in bounds
+  if(room.currentTurn>=room.players.length)room.currentTurn=0;
   room.players.forEach(p=>{
     const sid=userSocket[p.userId];
     if(sid)io.to(sid).emit('gameState',sanitizeForPlayer(room,p.userId));
@@ -332,7 +336,7 @@ function advanceTurn(room) {
   broadcastRoom(room.id);
 }
 function endBettingRound(room) {
-  if(room.gameType==='1333'){end1535BettingRound(room);return;}
+  if(room.gameType==='1535'){end1535BettingRound(room);return;}
   if(room.gameType==='badugi'){
     if(room.phase==='bbet'){
       if(room.drawRound<3){
@@ -381,8 +385,9 @@ function earlyWin(room) {
     broadcastRoom(room.id);
     setTimeout(()=>{
       if(rooms[room.id]){
-        room.players.forEach(p=>{p.folded=false;p.decl=null;p.ready=false;p.drawDone=false;p.acted=false;});
-        startGame(room.id);
+        room.players.forEach(p=>{p.folded=false;p.decl=null;p.ready=false;p.drawDone=false;p.acted=false;p.stayed=false;});
+        if(room.gameType==='1535') start1535Game(room.id);
+        else startGame(room.id);
       }
     },5000);
   }
@@ -391,7 +396,7 @@ function startGame(roomId) {
   const room=rooms[roomId];
   if(!room||room.players.length<2)return;
   if(room.gameType==='badugi'){startBadugiGame(roomId);return;}
-  if(room.gameType==='1333'){start1535Game(roomId);return;}
+  if(room.gameType==='1535'){start1535Game(roomId);return;}
   const deck=shuffle(makeDeck());
   let idx=0;
   const deal=n=>{const c=deck.slice(idx,idx+n);idx+=n;return c;};
@@ -693,7 +698,7 @@ io.on('connection',socket=>{
     addLog(room,`${p.displayName} posted ante.`);
     broadcastRoom(socket.roomId);
     if(room.gameType==='badugi')checkAllAntedBadugi(socket.roomId);
-    else if(room.gameType==='1333')checkAllAnted1535(socket.roomId);
+    else if(room.gameType==='1535')checkAllAnted1535(socket.roomId);
     else checkAllAnted(socket.roomId);
   });
   socket.on('selectDraw',({selected})=>{
@@ -801,7 +806,7 @@ io.on('connection',socket=>{
             p.folded=true;
             addLog(room,`${p.displayName} disconnected — auto-folded.`,'imp');
             if(room.currentTurn===pIdx){
-              if(room.gameType==='1333') advance1535Turn(room);
+              if(room.gameType==='1535') advance1535Turn(room);
               else advanceTurn(room);
             } else { broadcastRoom(roomId); }
           }
@@ -850,7 +855,7 @@ io.on('connection',socket=>{
       setTimeout(()=>{if(rooms[room.id]&&room.players.length>=2&&room.phase==='waiting')startGame(room.id);},3000);
     }
     // If joining during ante phase, deal them in
-    if(room.phase==='ante'&&room.gameType==='1333'){
+    if(room.phase==='ante'&&room.gameType==='1535'){
       const p=room.players[room.players.length-1];
       const deck=room.deck;
       let idx=room.deckIdx;
@@ -1241,7 +1246,7 @@ function botAnte(roomId) {
       addLog(r,`${p.displayName} posted ante.`);
       broadcastRoom(roomId);
       if(r.gameType==='badugi')checkAllAntedBadugi(roomId);
-      else if(r.gameType==='1333')checkAllAnted1535(roomId);
+      else if(r.gameType==='1535')checkAllAnted1535(roomId);
       else checkAllAnted(roomId);
     },1000+Math.random()*2000);
   });
@@ -1373,7 +1378,7 @@ function broadcastRoom(roomId) {
     const cur=room.players[room.currentTurn];
     if(cur&&cur.isBot) botDeclare(roomId);
   }
-  else if(room.phase==='hit'&&room.gameType==='1333'){
+  else if(room.phase==='hit'&&room.gameType==='1535'){
     const cur=room.players[room.currentTurn];
     if(cur&&cur.isBot) bot1535Action(roomId);
   }
