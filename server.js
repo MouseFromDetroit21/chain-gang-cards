@@ -604,8 +604,14 @@ function doBadugiShowdown(room) {
     addLog(room,`NO VALID BADUGI — POT ROLLS OVER! Pot is now $${room.pot}`,'imp');
   } else if(hWin&&lWin){
     room.pot=0;
-  } else {
-    room.pot=room.pot-half;
+  } else if(hWin||lWin){
+    // One side wins — they get whole pot, not just half
+    const soloWin=hWin||lWin;
+    const rp=room.players.find(p=>p.userId===soloWin.userId);
+    if(rp)rp.chips+=half; // already paid half above, pay remaining
+    db.updateUser(soloWin.userId,{chips:(db.findUser(u=>u.id===soloWin.userId)||{chips:0}).chips+half});
+    addLog(room,`FULL POT (+${half}): ${soloWin.displayName} takes it all!`,'win');
+    room.pot=0;
   }
   broadcastRoom(room.id);
   setTimeout(()=>{
