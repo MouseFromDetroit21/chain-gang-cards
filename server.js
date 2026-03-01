@@ -193,13 +193,8 @@ function createRoom(isPrivate=false,gameType='chaingang') {
 }
 function publicRoom(gameType) {
   const max=5;
-  // First look for waiting rooms, then ante-phase rooms with open human seats
-  const openRoom=Object.values(rooms).find(r=>!r.isPrivate&&r.phase==='waiting'&&r.players.length<max&&r.gameType===gameType&&r.players.filter(p=>!p.isBot).length<max);
-  if(openRoom)return openRoom;
-  // Find a room at ante phase that has bots and open seats
-  const anteRoom=Object.values(rooms).find(r=>!r.isPrivate&&r.phase==='ante'&&r.players.length<max&&r.gameType===gameType&&r.players.filter(p=>!p.isBot).length<max);
-  if(anteRoom)return anteRoom;
-  return createRoom(false,gameType);
+  // Only join waiting rooms — never interrupt a hand in progress
+  return Object.values(rooms).find(r=>!r.isPrivate&&r.phase==='waiting'&&r.players.length<max&&r.gameType===gameType)||createRoom(false,gameType);
 }
 function addLog(room,msg,type='act') {
   room.log.unshift({msg,type,ts:Date.now()});
