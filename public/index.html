@@ -382,6 +382,12 @@ function initSocket() {
   });
   socket.on('privateCode', code => { document.getElementById('room-code-display').textContent = code; });
   socket.on('lobbyError', msg => { document.getElementById('lb-err').textContent = msg; });
+  socket.on('rejoinRoom', ({roomId, gameType}) => {
+    currentRoom = roomId;
+    currentGame = gameType;
+    showScreen('game');
+    document.getElementById('game-content').innerHTML = '<div style="text-align:center;padding:40px;color:#888">Reconnecting to your table...</div>';
+  });
   socket.on('gameState', state => {
     if (state.phase === 'waiting') {
       renderWaiting(state);
