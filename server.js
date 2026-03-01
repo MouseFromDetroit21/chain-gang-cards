@@ -1070,15 +1070,21 @@ function bot1535Action(roomId) {
   if (!room) return;
   const p = room.players[room.currentTurn];
   if (!p || !p.isBot) return;
+  // If bot already stayed this round, skip their turn
+  if (p.stayed && p.drawDone) {
+    advance1535Turn(room);
+    return;
+  }
   const botIdx = room.currentTurn;
   const botUserId = p.userId;
   setTimeout(() => {
     const r = rooms[roomId];
     if (!r || r.phase !== 'hit') return;
-    // Verify it's still this bot's turn
     if (r.currentTurn !== botIdx) return;
     const bot = r.players[botIdx];
-    if (!bot || !bot.isBot || bot.stayed || bot.folded) return;
+    if (!bot || !bot.isBot || bot.folded) return;
+    // If already stayed just advance
+    if (bot.stayed && bot.drawDone) { advance1535Turn(r); return; }
     const { score } = calc1535Score(bot.hand);
     if (is1535Low(score) || is1535High(score)) {
       player1535Stay(roomId, botUserId);
@@ -1208,7 +1214,7 @@ function botBet(roomId) {
     if(!r||!r.players[r.currentTurn]?.isBot)return;
     const bot=r.players[r.currentTurn];
     if(!bot||!bot.isBot)return;
-    const isFinalBet=r.phase==='bet3'||r.phase==='fbet';
+    const isFinalBet=r.phase==='bet3'||r.phase==='fbet'||r.phase==='bet';
     const maxBet=isFinalBet?25:15;
     const rand=Math.random();
     // House favored — bots rarely fold, often raise
