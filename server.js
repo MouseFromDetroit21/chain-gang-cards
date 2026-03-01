@@ -15,6 +15,7 @@ const io = new Server(server, {
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'chaingangpoker_secret_2024';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'dgm$admin2024';
 const PORT = process.env.PORT || 3000;
 
 const dbFile = path.join(__dirname, 'db.json');
@@ -38,6 +39,29 @@ const db = {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// Admin API
+app.get('/admin/api/users',(req,res)=>{
+  const key=req.query.key||req.headers['x-admin-key'];
+  if(key!==ADMIN_KEY)return res.status(401).json({error:'Unauthorized'});
+  const users=db.getUsers().map(u=>({
+    id:u.id,username:u.username,displayName:u.displayName,
+    avatar:u.avatar,chips:u.chips,wins:u.wins||0,
+    createdAt:u.createdAt||'unknown'
+  }));
+  const activeRooms=Object.values(rooms).map(r=>({
+    id:r.id,gameType:r.gameType,phase:r.phase,
+    players:r.players.map(p=>p.displayName),pot:r.pot
+  }));
+  res.json({users,activeRooms,totalUsers:users.length});
+});
+
+// Admin dashboard
+app.get('/admin',(req,res)=>{
+  const key=req.query.key;
+  if(key!==ADMIN_KEY)return res.status(401).send('<h1>401 Unauthorized</h1><p>Add ?key=YOUR_ADMIN_KEY to the URL</p>');
+  res.sendFile(path.join(__dirname,'public','admin.html'));
+});
 
 function safeUser(u) {
   return { id: u.id, username: u.username, displayName: u.displayName, avatar: u.avatar, chips: u.chips, wins: u.wins, losses: u.losses };

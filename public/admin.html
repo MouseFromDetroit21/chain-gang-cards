@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chain Gang Admin</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#060d06; color:#f0e6c8; font-family:Arial,sans-serif; padding:20px; }
+h1 { color:#d4a017; font-size:1.8rem; letter-spacing:4px; margin-bottom:4px; }
+h2 { color:#d4a017; font-size:1rem; letter-spacing:2px; margin:20px 0 10px; }
+.sub { color:#666; font-size:0.7rem; letter-spacing:2px; margin-bottom:20px; }
+.stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+.stat { background:#0d0d0d; border:1px solid #2a2a2a; border-radius:10px; padding:16px 20px; min-width:120px; }
+.stat-val { font-size:1.8rem; font-weight:700; color:#d4a017; }
+.stat-label { font-size:0.65rem; color:#666; letter-spacing:2px; margin-top:4px; }
+table { width:100%; border-collapse:collapse; background:#0d0d0d; border-radius:10px; overflow:hidden; }
+th { background:#1a1a1a; color:#d4a017; font-size:0.7rem; letter-spacing:2px; padding:10px 12px; text-align:left; }
+td { padding:10px 12px; font-size:0.85rem; border-bottom:1px solid #1a1a1a; }
+tr:hover td { background:#111; }
+.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.65rem; font-weight:700; letter-spacing:1px; }
+.badge-green { background:#1a4a2a; color:#4dff88; }
+.badge-gold { background:#2a1a00; color:#d4a017; }
+.badge-blue { background:#0a1a3a; color:#4488ff; }
+.rooms { display:flex; gap:10px; flex-wrap:wrap; }
+.room-card { background:#0d0d0d; border:1px solid #2a2a2a; border-radius:8px; padding:12px; min-width:180px; }
+.room-card h3 { font-size:0.75rem; color:#d4a017; letter-spacing:2px; margin-bottom:8px; }
+.room-card p { font-size:0.7rem; color:#888; margin-bottom:4px; }
+.refresh { background:#d4a017; color:#000; border:none; padding:8px 16px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.8rem; letter-spacing:1px; margin-bottom:20px; }
+.search { background:#111; border:1px solid #333; color:#f0e6c8; padding:8px 12px; border-radius:6px; font-size:0.85rem; width:100%; max-width:300px; margin-bottom:12px; outline:none; }
+</style>
+</head>
+<body>
+<h1>⛓ CHAIN GANG ADMIN</h1>
+<div class="sub">DGM$ POKER NETWORK — ADMIN DASHBOARD</div>
+<button class="refresh" onclick="loadData()">↻ REFRESH</button>
+<div class="stats" id="stats"></div>
+<h2>ACTIVE TABLES</h2>
+<div class="rooms" id="rooms"><p style="color:#666">No active tables</p></div>
+<h2>PLAYERS</h2>
+<input class="search" id="search" placeholder="Search players..." oninput="filterTable()">
+<table>
+  <thead>
+    <tr>
+      <th>AVATAR</th>
+      <th>USERNAME</th>
+      <th>DISPLAY NAME</th>
+      <th>CHIPS</th>
+      <th>WINS</th>
+      <th>JOINED</th>
+    </tr>
+  </thead>
+  <tbody id="players-table"></tbody>
+</table>
+<script>
+const key = new URLSearchParams(window.location.search).get('key');
+let allUsers = [];
+
+async function loadData() {
+  try {
+    const res = await fetch('/admin/api/users?key=' + key);
+    if (!res.ok) { document.body.innerHTML = '<h1 style="color:red;padding:40px">Unauthorized</h1>'; return; }
+    const data = await res.json();
+    allUsers = data.users;
+    // Stats
+    const totalChips = data.users.reduce((s,u) => s+u.chips, 0);
+    const totalWins = data.users.reduce((s,u) => s+u.wins, 0);
+    document.getElementById('stats').innerHTML =
+      stat(data.totalUsers, 'PLAYERS') +
+      stat('$'+totalChips, 'CHIPS IN PLAY') +
+      stat(totalWins, 'TOTAL WINS') +
+      stat(data.activeRooms.length, 'ACTIVE TABLES');
+    // Rooms
+    const roomsEl = document.getElementById('rooms');
+    if (data.activeRooms.length === 0) {
+      roomsEl.innerHTML = '<p style="color:#666;font-size:0.8rem">No active tables</p>';
+    } else {
+      roomsEl.innerHTML = data.activeRooms.map(r =>
+        `<div class="room-card">
+          <h3>${r.gameType.toUpperCase()} — ${r.id}</h3>
+          <p>Phase: <span style="color:#d4a017">${r.phase}</span></p>
+          <p>Pot: <span style="color:#4dff88">$${r.pot}</span></p>
+          <p>Players: ${r.players.join(', ')}</p>
+        </div>`
+      ).join('');
+    }
+    filterTable();
+  } catch(e) { console.error(e); }
+}
+
+function stat(val, label) {
+  return `<div class="stat"><div class="stat-val">${val}</div><div class="stat-label">${label}</div></div>`;
+}
+
+function filterTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = allUsers.filter(u => 
+    u.username.includes(q) || u.displayName.toLowerCase().includes(q)
+  );
+  document.getElementById('players-table').innerHTML = filtered.map(u =>
+    `<tr>
+      <td style="font-size:1.4rem">${u.avatar}</td>
+      <td>${u.username}</td>
+      <td>${u.displayName}</td>
+      <td><span class="badge badge-gold">$${u.chips}</span></td>
+      <td><span class="badge badge-green">${u.wins} W</span></td>
+      <td style="color:#666;font-size:0.75rem">${u.createdAt}</td>
+    </tr>`
+  ).join('');
+}
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>
